@@ -22,8 +22,7 @@ type alias Model =
 
 type alias Axis =
   { max_extent : Float
-  , min_extent : Float
-  , max_value : Float
+  , max_value : Float 
   , min_value : Float
   }
 
@@ -33,13 +32,20 @@ type Msg
 
 initialModel : Model
 initialModel =
-    { data = [ {x = 10, y = 20, active = True, id = 1}
-             , {x = 20, y = 30, active = False, id = 2}
+    { data = [ {x = 10, y = 10, active = True, id = 1}
+             , {x = 20, y = 20, active = False, id = 2}
              , {x = 30, y = 40, active = True, id = 3}
              ]
-    , x_axis = Axis 120 0 30 10
-    , y_axis = Axis 120 0 20 40
+    , x_axis = Axis 120 30 10
+    , y_axis = Axis 120 40 20
     }
+
+max_y : Model -> Float
+max_y model =
+  case LE.maximumBy .y model.data of
+    Just point -> 
+      point.y
+    Nothing ->  120
 
 max_x : Model -> Float
 max_x model =
@@ -50,7 +56,10 @@ max_x model =
 
 axisTransform : Axis -> Float -> Float
 axisTransform axis value =
-  (axis.max_value - axis.min_value)/(axis.max_extent - axis.min_extent) * value
+  -- ((axis.max_value - axis.min_value)/(axis.max_extent - axis.min_extent) / value) * axis.max_extent
+  (axis.max_extent/(axis.max_value - axis.min_value) / value ) * axis.max_extent
+
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -61,10 +70,13 @@ update msg model =
     SwitchPoint point ->
       let
         _ = Debug.log "clicked" point
+        old_list = List.filter (\x -> x.id /= point.id) model.data
+        new_point = { point | active = not point.active}
+        -- new_model = { model | data = old_list ++ new_point }
         -- remove current point
         -- invert the active flag
         -- re-add to list
-        newData = model.data
+        newData = old_list ++ [new_point]
       in
       ( { model | data = newData } ! [])
 
@@ -72,18 +84,26 @@ viewBox_ : Model -> String
 viewBox_ model = 
   String.concat ["0 0 ", (toString model.x_axis.max_extent),  " ",  (toString model.y_axis.max_extent)]
 
-dots : Point -> Svg Msg
-dots point = 
+translateCoords : Model -> String
+translateCoords model =
+  String.concat ["translate(0," , toString model.x_axis.max_extent ,") scale(1,-1)"]
+
+dots : Model -> Point -> Svg Msg
+dots model point = 
   let
       color = case point.active of
                 True ->
                   "black"
                 False ->
                   "grey"
+
+      x_axis_transform = axisTransform model.x_axis
+
+      y_axis_transform = axisTransform model.y_axis
   in
     circle 
-      [ cx (toString point.x)
-      , cy (toString point.y)
+      [ cx (toString (x_axis_transform point.x))
+      , cy (toString (y_axis_transform point.y))
       , r "5" 
       , stroke color
       , fill color
@@ -92,9 +112,14 @@ dots point =
 
 view : Model -> Html Msg
 view model =
-  svg
-    [ width (toString model.x_axis.max_extent), height (toString model.y_axis.max_extent), viewBox (viewBox_ model) ]
-    (List.map dots model.data)
+  let 
+      dots_transform = dots model
+  in
+      svg
+        [ width (toString model.x_axis.max_extent), height (toString model.y_axis.max_extent), viewBox (viewBox_ model) ]
+        [ g [ transform  (translateCoords model)]
+        (List.map dots_transform model.data)
+        ]
 
 
 subscriptions : Model -> Sub Msg
