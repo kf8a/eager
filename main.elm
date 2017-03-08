@@ -36,8 +36,8 @@ initialModel =
              , {x = 20, y = 20, active = False, id = 2}
              , {x = 30, y = 40, active = True, id = 3}
              ]
-    , x_axis = Axis 120 30 10
-    , y_axis = Axis 120 40 20
+    , x_axis = Axis 220 40 0
+    , y_axis = Axis 120 50 0
     }
 
 max_y : Model -> Float
@@ -57,7 +57,8 @@ max_x model =
 axisTransform : Axis -> Float -> Float
 axisTransform axis value =
   -- ((axis.max_value - axis.min_value)/(axis.max_extent - axis.min_extent) / value) * axis.max_extent
-  (axis.max_extent/(axis.max_value - axis.min_value) / value ) * axis.max_extent
+  -- (axis.max_extent/(axis.max_value - axis.min_value) / value ) * axis.max_extent
+  (axis.max_extent/(axis.max_value - axis.min_value) * value )
 
 
 
@@ -69,13 +70,8 @@ update msg model =
 
     SwitchPoint point ->
       let
-        _ = Debug.log "clicked" point
         old_list = List.filter (\x -> x.id /= point.id) model.data
         new_point = { point | active = not point.active}
-        -- new_model = { model | data = old_list ++ new_point }
-        -- remove current point
-        -- invert the active flag
-        -- re-add to list
         newData = old_list ++ [new_point]
       in
       ( { model | data = newData } ! [])
@@ -86,7 +82,7 @@ viewBox_ model =
 
 translateCoords : Model -> String
 translateCoords model =
-  String.concat ["translate(0," , toString model.x_axis.max_extent ,") scale(1,-1)"]
+  String.concat ["translate(0," , toString model.y_axis.max_extent ,") scale(1,-1)"]
 
 dots : Model -> Point -> Svg Msg
 dots model point = 
