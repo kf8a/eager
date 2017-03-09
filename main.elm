@@ -168,15 +168,6 @@ co2_dots x_axis y_axis points =
         List.map (\x -> dots_transform (SwitchCO2 x) x) points
 
 
-draw_graph_co2 : Axis -> Axis -> List Point -> Svg Msg
-draw_graph_co2 x_axis y_axis points =
-    let
-        dots_transform =
-            co2_dots x_axis y_axis points
-    in
-        draw_graph dots_transform x_axis y_axis points
-
-
 ch4_dots : Axis -> Axis -> List Point -> List (Svg Msg)
 ch4_dots x_axis y_axis points =
     let
@@ -184,15 +175,6 @@ ch4_dots x_axis y_axis points =
             dots x_axis y_axis
     in
         List.map (\x -> dots_transform (SwitchCH4 x) x) points
-
-
-draw_graph_ch4 : Axis -> Axis -> List Point -> Svg Msg
-draw_graph_ch4 x_axis y_axis points =
-    let
-        dots_transform =
-            ch4_dots x_axis y_axis points
-    in
-        draw_graph dots_transform x_axis y_axis points
 
 
 n2o_dots : Axis -> Axis -> List Point -> List (Svg Msg)
@@ -204,22 +186,23 @@ n2o_dots x_axis y_axis points =
         List.map (\x -> dots_transform (SwitchN2O x) x) points
 
 
-draw_graph_n2o : Axis -> Axis -> List Point -> Svg Msg
-draw_graph_n2o x_axis y_axis points =
-    let
-        dots_transform =
-            n2o_dots x_axis y_axis points
-    in
-        draw_graph dots_transform x_axis y_axis points
-
-
 view : Model -> Html Msg
 view model =
-    div []
-        [ draw_graph_co2 model.x_axis model.y_axis model.incubation.co2
-        , draw_graph_ch4 model.x_axis model.y_axis model.incubation.ch4
-        , draw_graph_n2o model.x_axis model.y_axis model.incubation.n2o
-        ]
+    let
+        dots_n2o =
+            n2o_dots model.x_axis model.y_axis model.incubation.n2o
+
+        dots_co2 =
+            co2_dots model.x_axis model.y_axis model.incubation.co2
+
+        dots_ch4 =
+            ch4_dots model.x_axis model.y_axis model.incubation.ch4
+    in
+        div []
+            [ draw_graph dots_co2 model.x_axis model.y_axis model.incubation.co2
+            , draw_graph dots_ch4 model.x_axis model.y_axis model.incubation.ch4
+            , draw_graph dots_n2o model.x_axis model.y_axis model.incubation.n2o
+            ]
 
 
 subscriptions : Model -> Sub Msg
