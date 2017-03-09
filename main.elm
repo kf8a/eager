@@ -18,9 +18,9 @@ type alias Model =
 
 
 type Msg
-    = SwitchPoint Point
-    | SwitchCO2 Point
+    = SwitchCO2 Point
     | SwitchCH4 Point
+    | SwitchN2O Point
     | NextIncubation
     | None
 
@@ -34,13 +34,13 @@ initialModel =
             , { x = 30, y = 40, active = True, id = 3 }
             ]
         , ch4 =
-            [ { x = 10, y = 10, active = True, id = 1 }
+            [ { x = 10, y = 30, active = True, id = 1 }
             , { x = 20, y = 20, active = False, id = 2 }
-            , { x = 30, y = 40, active = True, id = 3 }
+            , { x = 30, y = 10, active = True, id = 3 }
             ]
         , n2o =
             [ { x = 10, y = 10, active = True, id = 1 }
-            , { x = 20, y = 20, active = False, id = 2 }
+            , { x = 15, y = 30, active = False, id = 2 }
             , { x = 30, y = 40, active = True, id = 3 }
             ]
         }
@@ -79,6 +79,15 @@ update_incubation_ch4 incubation point =
         { incubation | ch4 = new_points }
 
 
+update_incubation_n2o : Incubation -> Point -> Incubation
+update_incubation_n2o incubation point =
+    let
+        new_points =
+            update_point point incubation.n2o
+    in
+        { incubation | n2o = new_points }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -99,22 +108,10 @@ update msg model =
             in
                 ({ model | incubation = new_incubation } ! [])
 
-        SwitchPoint point ->
+        SwitchN2O point ->
             let
-                incubation =
-                    model.incubation
-
-                old_list =
-                    List.filter (\x -> x.id /= point.id) incubation.ch4
-
-                new_point =
-                    { point | active = not point.active }
-
-                new_co2 =
-                    old_list ++ [ new_point ]
-
                 new_incubation =
-                    { incubation | co2 = new_co2 }
+                    update_incubation_n2o model.incubation point
             in
                 ({ model | incubation = new_incubation } ! [])
 
@@ -150,36 +147,70 @@ dots x_axis y_axis msg point =
             []
 
 
-draw_graph_co2 : Axis -> Axis -> List Point -> Svg Msg
-draw_graph_co2 x_axis y_axis points =
+draw_graph : List (Svg Msg) -> Axis -> Axis -> List Point -> Svg Msg
+draw_graph drawing_func x_axis y_axis points =
+    svg
+        [ width (toString x_axis.max_extent)
+        , height (toString y_axis.max_extent)
+        , viewBox (viewBox_ x_axis y_axis)
+        ]
+        [ g [ transform (translateCoords y_axis) ]
+            drawing_func
+        ]
+
+
+co2_dots : Axis -> Axis -> List Point -> List (Svg Msg)
+co2_dots x_axis y_axis points =
     let
         dots_transform =
             dots x_axis y_axis
     in
-        svg
-            [ width (toString x_axis.max_extent)
-            , height (toString y_axis.max_extent)
-            , viewBox (viewBox_ x_axis y_axis)
-            ]
-            [ g [ transform (translateCoords y_axis) ]
-                (List.map (\x -> dots_transform (SwitchCO2 x) x) points)
-            ]
+        List.map (\x -> dots_transform (SwitchCO2 x) x) points
+
+
+draw_graph_co2 : Axis -> Axis -> List Point -> Svg Msg
+draw_graph_co2 x_axis y_axis points =
+    let
+        dots_transform =
+            co2_dots x_axis y_axis points
+    in
+        draw_graph dots_transform x_axis y_axis points
+
+
+ch4_dots : Axis -> Axis -> List Point -> List (Svg Msg)
+ch4_dots x_axis y_axis points =
+    let
+        dots_transform =
+            dots x_axis y_axis
+    in
+        List.map (\x -> dots_transform (SwitchCH4 x) x) points
 
 
 draw_graph_ch4 : Axis -> Axis -> List Point -> Svg Msg
 draw_graph_ch4 x_axis y_axis points =
     let
         dots_transform =
+            ch4_dots x_axis y_axis points
+    in
+        draw_graph dots_transform x_axis y_axis points
+
+
+n2o_dots : Axis -> Axis -> List Point -> List (Svg Msg)
+n2o_dots x_axis y_axis points =
+    let
+        dots_transform =
             dots x_axis y_axis
     in
-        svg
-            [ width (toString x_axis.max_extent)
-            , height (toString y_axis.max_extent)
-            , viewBox (viewBox_ x_axis y_axis)
-            ]
-            [ g [ transform (translateCoords y_axis) ]
-                (List.map (\x -> dots_transform (SwitchCH4 x) x) points)
-            ]
+        List.map (\x -> dots_transform (SwitchN2O x) x) points
+
+
+draw_graph_n2o : Axis -> Axis -> List Point -> Svg Msg
+draw_graph_n2o x_axis y_axis points =
+    let
+        dots_transform =
+            n2o_dots x_axis y_axis points
+    in
+        draw_graph dots_transform x_axis y_axis points
 
 
 view : Model -> Html Msg
@@ -187,6 +218,7 @@ view model =
     div []
         [ draw_graph_co2 model.x_axis model.y_axis model.incubation.co2
         , draw_graph_ch4 model.x_axis model.y_axis model.incubation.ch4
+        , draw_graph_n2o model.x_axis model.y_axis model.incubation.n2o
         ]
 
 
