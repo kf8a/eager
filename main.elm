@@ -21,6 +21,9 @@ type Msg
     = SwitchCO2 Point
     | SwitchCH4 Point
     | SwitchN2O Point
+    | FluxGood Incubation
+    | FluxMaybeGood Incubation
+    | FluxBad Incubation
     | NextIncubation
     | None
 
@@ -118,6 +121,15 @@ update msg model =
         NextIncubation ->
             (model ! [])
 
+        FluxGood incubation ->
+            (model ! [])
+
+        FluxMaybeGood incubation ->
+            (model ! [])
+
+        FluxBad incubation ->
+            (model ! [])
+
 
 viewBox_ : Axis -> Axis -> String
 viewBox_ x_axis y_axis =
@@ -199,9 +211,14 @@ view model =
             ch4_dots model.x_axis model.y_axis model.incubation.ch4
     in
         div []
-            [ draw_graph dots_co2 model.x_axis model.y_axis model.incubation.co2
-            , draw_graph dots_ch4 model.x_axis model.y_axis model.incubation.ch4
-            , draw_graph dots_n2o model.x_axis model.y_axis model.incubation.n2o
+            [ div []
+                [ draw_graph dots_co2 model.x_axis model.y_axis model.incubation.co2
+                , draw_graph dots_ch4 model.x_axis model.y_axis model.incubation.ch4
+                , draw_graph dots_n2o model.x_axis model.y_axis model.incubation.n2o
+                ]
+            , button [ onClick (FluxGood model.incubation) ] [ Html.text "Good" ]
+            , button [ onClick (FluxMaybeGood model.incubation) ] [ Html.text "Maybe" ]
+            , button [ onClick (FluxBad model.incubation) ] [ Html.text "Bad" ]
             ]
 
 
