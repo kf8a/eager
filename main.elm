@@ -1,19 +1,35 @@
 module Main exposing (..)
 
 import Graph exposing (..)
+import Date exposing (..)
+import Date.Extra as DE exposing (..)
+import Time exposing (..)
+import Json.Decode as JD exposing (..)
+import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Html
 import Html exposing (..)
 import Html exposing (program, Html)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (..)
-import List.Extra as LE
+import SampleIncubation exposing (json, nextJson)
+
+
+type Status
+    = Good
+    | Bad
+    | MaybeGood
+    | NotChecked
 
 
 type alias Model =
     { incubation : Incubation
+    , next_incubation : Incubation
     , x_axis : Axis
-    , y_axis : Axis
+    , y_axis_co2 : Axis
+    , y_axis_ch4 : Axis
+    , y_axis_n2o : Axis
+    , status : Status
     }
 
 
@@ -25,31 +41,126 @@ type Msg
     | FluxMaybeGood Incubation
     | FluxBad Incubation
     | NextIncubation
-    | None
 
 
 initialModel : Model
 initialModel =
-    { incubation =
-        { co2 =
-            [ { x = 10, y = 10, active = True, id = 1 }
-            , { x = 20, y = 20, active = False, id = 2 }
-            , { x = 30, y = 40, active = True, id = 3 }
-            ]
-        , ch4 =
-            [ { x = 10, y = 30, active = True, id = 1 }
-            , { x = 20, y = 20, active = False, id = 2 }
-            , { x = 30, y = 10, active = True, id = 3 }
-            ]
-        , n2o =
-            [ { x = 10, y = 10, active = True, id = 1 }
-            , { x = 15, y = 30, active = False, id = 2 }
-            , { x = 30, y = 40, active = True, id = 3 }
-            ]
-        }
-    , x_axis = Axis 220 40 0
-    , y_axis = Axis 120 50 0
+    { incubation = toIncubation (decodeInjections SampleIncubation.json)
+    , next_incubation = toIncubation (decodeInjections SampleIncubation.nextJson)
+    , x_axis = Axis 220 100 0
+    , y_axis_co2 = Axis 120 200 0
+    , y_axis_ch4 = Axis 120 3 0
+    , y_axis_n2o = Axis 120 1 0
+    , status = NotChecked
     }
+
+
+type alias Injection =
+    { co2_ppm : Float
+    , n2o_ppm : Float
+    , ch4_ppm : Float
+    , id : Int
+    , deleted : Bool
+    , datetime : Date
+    }
+
+
+sortedRecords : Injection -> Injection -> Order
+sortedRecords a b =
+    DE.compare a.datetime b.datetime
+
+
+initialTime : List Injection -> Date
+initialTime injections =
+    let
+        sorted =
+            List.sortWith sortedRecords injections
+
+        firstRecord =
+            List.head sorted
+    in
+        case firstRecord of
+            Just injection ->
+                injection.datetime
+
+            Nothing ->
+                Date.fromTime (Time.inSeconds 0)
+
+
+toIncubation : List Injection -> Incubation
+toIncubation injections =
+    let
+        interval time =
+            ((Date.toTime time) - Date.toTime (initialTime injections)) / 1000 / 60
+
+        co2s =
+            List.map
+                (\x ->
+                    Point (interval x.datetime) x.co2_ppm x.deleted x.id
+                )
+                injections
+
+        ch4s =
+            List.map
+                (\x ->
+                    Point (interval x.datetime) x.ch4_ppm True x.id
+                )
+                injections
+
+        n2os =
+            List.map
+                (\x ->
+                    Point (interval x.datetime) x.n2o_ppm True x.id
+                )
+                injections
+    in
+        Incubation co2s ch4s n2os
+
+
+
+-- Decoders
+
+
+date : Decoder Date
+date =
+    let
+        convert : String -> Decoder Date
+        convert raw =
+            case Date.fromString raw of
+                Ok date ->
+                    succeed date
+
+                Err msg ->
+                    fail msg
+    in
+        JD.string |> JD.andThen convert
+
+
+incubationDecoder : Decoder Injection
+incubationDecoder =
+    decode Injection
+        |> required "co2_ppm" float
+        |> required "n2o_ppm" float
+        |> required "ch4_ppm" float
+        |> required "id" int
+        |> hardcoded False
+        |> required "sampled_at" date
+
+
+responseDecoder : Decoder (List Injection)
+responseDecoder =
+    decode identity
+        |> required "data" (list incubationDecoder)
+
+
+decodeInjections : String -> List Injection
+decodeInjections json =
+    case decodeString responseDecoder json of
+        Ok listOfInjections ->
+            listOfInjections
+
+        Err msg ->
+            []
 
 
 update_point : Point -> List Point -> List Point
@@ -91,49 +202,87 @@ update_incubation_n2o incubation point =
         { incubation | n2o = new_points }
 
 
+swapIncubation : Model -> Model
+swapIncubation model =
+    let
+        inc =
+            model.next_incubation
+    in
+        { model
+            | next_incubation = model.incubation
+            , incubation = inc
+        }
+
+
+url : String
+url =
+    "http://localhost:3000/incubation"
+
+
+fetchNextIncubation : Cmd Msg
+fetchNextIncubation =
+    Cmd.none
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        None ->
-            (model ! [])
+    let
+        _ =
+            Debug.log "model" model
+    in
+        case msg of
+            SwitchCO2 point ->
+                let
+                    new_incubation =
+                        update_incubation_co2 model.incubation point
+                in
+                    ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchCO2 point ->
-            let
-                new_incubation =
-                    update_incubation_co2 model.incubation point
-            in
-                ({ model | incubation = new_incubation } ! [])
+            SwitchCH4 point ->
+                let
+                    new_incubation =
+                        update_incubation_ch4 model.incubation point
+                in
+                    ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchCH4 point ->
-            let
-                new_incubation =
-                    update_incubation_ch4 model.incubation point
-            in
-                ({ model | incubation = new_incubation } ! [])
+            SwitchN2O point ->
+                let
+                    new_incubation =
+                        update_incubation_n2o model.incubation point
+                in
+                    ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchN2O point ->
-            let
-                new_incubation =
-                    update_incubation_n2o model.incubation point
-            in
-                ({ model | incubation = new_incubation } ! [])
+            NextIncubation ->
+                let
+                    _ =
+                        Debug.log "Model" model
+                in
+                    ( model, Cmd.none )
 
-        NextIncubation ->
-            (model ! [])
+            FluxGood incubation ->
+                let
+                    new_model =
+                        swapIncubation model
+                in
+                    ( { new_model | status = Good }, fetchNextIncubation )
 
-        FluxGood incubation ->
-            (model ! [])
+            FluxMaybeGood incubation ->
+                let
+                    new_model =
+                        swapIncubation model
+                in
+                    ( { new_model | status = MaybeGood }, fetchNextIncubation )
 
-        FluxMaybeGood incubation ->
-            (model ! [])
+            FluxBad incubation ->
+                let
+                    new_model =
+                        swapIncubation model
+                in
+                    ( { new_model | status = Bad }, fetchNextIncubation )
 
-        FluxBad incubation ->
-            (model ! [])
 
 
-viewBox_ : Axis -> Axis -> String
-viewBox_ x_axis y_axis =
-    String.concat [ "0 0 ", (toString x_axis.max_extent), " ", (toString y_axis.max_extent) ]
+-- VIEW
 
 
 dots : Axis -> Axis -> Msg -> Point -> Svg Msg
@@ -202,19 +351,19 @@ view : Model -> Html Msg
 view model =
     let
         dots_n2o =
-            n2o_dots model.x_axis model.y_axis model.incubation.n2o
+            n2o_dots model.x_axis model.y_axis_n2o model.incubation.n2o
 
         dots_co2 =
-            co2_dots model.x_axis model.y_axis model.incubation.co2
+            co2_dots model.x_axis model.y_axis_co2 model.incubation.co2
 
         dots_ch4 =
-            ch4_dots model.x_axis model.y_axis model.incubation.ch4
+            ch4_dots model.x_axis model.y_axis_ch4 model.incubation.ch4
     in
         div []
             [ div []
-                [ draw_graph dots_co2 model.x_axis model.y_axis model.incubation.co2
-                , draw_graph dots_ch4 model.x_axis model.y_axis model.incubation.ch4
-                , draw_graph dots_n2o model.x_axis model.y_axis model.incubation.n2o
+                [ draw_graph dots_co2 model.x_axis model.y_axis_co2 model.incubation.co2
+                , draw_graph dots_ch4 model.x_axis model.y_axis_ch4 model.incubation.ch4
+                , draw_graph dots_n2o model.x_axis model.y_axis_n2o model.incubation.n2o
                 ]
             , button [ onClick (FluxGood model.incubation) ] [ Html.text "Good" ]
             , button [ onClick (FluxMaybeGood model.incubation) ] [ Html.text "Maybe" ]

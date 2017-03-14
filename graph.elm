@@ -59,7 +59,7 @@ pointColor : Bool -> String
 pointColor active =
     case active of
         True ->
-            "black"
+            "blue"
 
         False ->
             "grey"
@@ -68,3 +68,8 @@ pointColor active =
 translateCoords : Axis -> String
 translateCoords axis =
     String.concat [ "translate(0,", toString axis.max_extent, ") scale(1,-1)" ]
+
+
+viewBox_ : Axis -> Axis -> String
+viewBox_ x_axis y_axis =
+    String.concat [ "0 0 ", (toString x_axis.max_extent), " ", (toString y_axis.max_extent) ]
