@@ -24,7 +24,7 @@ json =
             "fid_mv": null,
             "ecd_mv": null,
             "co2_ppm": 73.04869842529297,
-            "ch4_ppm": 2282.13671875
+            "ch4_ppm": 1.33671875
         },
         {
             "sampled_at": "2011-05-04T20:11:15.849210",
@@ -53,7 +53,7 @@ json =
             "id": 264648,
             "fid_mv": null,
             "ecd_mv": null,
-            "co2_ppm": -50,
+            "co2_ppm": 500,
             "ch4_ppm": 1.8188018798828125
         }
     ]
@@ -84,7 +84,7 @@ nextJson =
             "fid_mv": null,
             "ecd_mv": null,
             "co2_ppm": 63.04869842529297,
-            "ch4_ppm": 282.13671875
+            "ch4_ppm": 2.1213671875
         },
         {
             "sampled_at": "2011-05-04T20:11:15.849210",

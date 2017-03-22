@@ -1,7 +1,5 @@
 module Main exposing (..)
 
---import Graph exposing (..)
-
 import Date exposing (..)
 import Date.Extra as DE exposing (..)
 import Time exposing (..)
@@ -15,14 +13,8 @@ import Svg.Attributes exposing (..)
 import Svg.Events exposing (..)
 import SampleIncubation exposing (json, nextJson)
 import List.Extra as LE
-
-
-type alias Point =
-    { x : Float
-    , y : Float
-    , deleted : Bool
-    , id : Int
-    }
+import Http
+import LeastSquares exposing (..)
 
 
 type alias Flux =
@@ -42,17 +34,9 @@ type alias Incubation =
     }
 
 
-
--- type alias Incubation =
---     { co2 : List Point
---     , ch4 : List Point
---     , n2o : List Point
---     , injections : List Injection
---     }
-
-
 type alias Axis =
     { max_extent : Float
+    , min_extent : Float
     , min_value : Float
     , max_value : Float
     }
@@ -89,7 +73,7 @@ type Msg
     | FluxGood Incubation
     | FluxMaybeGood Incubation
     | FluxBad Incubation
-    | NextIncubation
+    | LoadIncubation (Result Http.Error (List Injection))
 
 
 initialModel : Model
@@ -103,6 +87,10 @@ initialModel =
 sortedRecords : Injection -> Injection -> Order
 sortedRecords a b =
     DE.compare a.datetime b.datetime
+
+
+
+-- Translators
 
 
 initialTime : List Injection -> Date
@@ -144,12 +132,18 @@ updateInjection injections id active =
         List.concat [ rest, newIncubation ]
 
 
+fluxWithDefault : Result String Fit -> Axis -> Axis -> List Point -> Flux
+fluxWithDefault fit xAxis yAxis points =
+    case fit of
+        Ok fit ->
+            Flux points xAxis yAxis fit.slope fit.intercept
 
--- toInjection : List Incubation -> List Incubation
--- toInjection incubation =
---     List.map (\x -> updateInjection incubation.injections x.id x.active) incubation.co2
--- toFlux : List Injection  -> Flux
--- toFlux : injections =
+        Err message ->
+            let
+                _ =
+                    Debug.log "Fit Error " message
+            in
+                Flux points xAxis yAxis 0 0
 
 
 toIncubation : List Injection -> Incubation
@@ -162,10 +156,10 @@ toIncubation injections =
             interval startTime
 
         xAxis =
-            Axis 200 0 200
+            Axis 200 0 0 200
 
         yAxis =
-            Axis 120 0
+            Axis 120 0 0
 
         co2Points =
             List.map
@@ -174,8 +168,14 @@ toIncubation injections =
                 )
                 injections
 
+        fit =
+            fitLineByLeastSquares co2Points
+
+        maxYco2 =
+            maxY co2Points
+
         co2s =
-            Flux co2Points xAxis (yAxis (maxY co2Points)) 0 0
+            fluxWithDefault fit xAxis (yAxis (maxY co2Points)) co2Points
 
         ch4Points =
             List.map
@@ -184,8 +184,11 @@ toIncubation injections =
                 )
                 injections
 
+        fitch4 =
+            fitLineByLeastSquares ch4Points
+
         ch4s =
-            Flux ch4Points xAxis (yAxis (maxY ch4Points)) 0 0
+            fluxWithDefault fitch4 xAxis (yAxis (maxY ch4Points)) ch4Points
 
         n2oPoints =
             List.map
@@ -194,8 +197,11 @@ toIncubation injections =
                 )
                 injections
 
+        fitn2o =
+            fitLineByLeastSquares n2oPoints
+
         n2os =
-            Flux n2oPoints xAxis (yAxis (maxY n2oPoints)) 0 0
+            fluxWithDefault fitn2o xAxis (yAxis (maxY n2oPoints)) n2oPoints
     in
         Incubation co2s ch4s n2os injections
 
@@ -285,16 +291,6 @@ pointColor deleted =
             "blue"
 
 
-translateCoords : Axis -> String
-translateCoords axis =
-    String.concat [ "translate(0,", toString axis.max_extent, ") scale(1,-1)" ]
-
-
-viewBox_ : Axis -> Axis -> String
-viewBox_ x_axis y_axis =
-    String.concat [ "0 0 ", (toString x_axis.max_extent), " ", (toString y_axis.max_extent) ]
-
-
 update_point : Point -> List Point -> List Point
 update_point point incubation =
     let
@@ -316,8 +312,20 @@ update_incubation_co2 incubation point =
         newPoints =
             update_point point co2.points
 
+        fit =
+            fitLineByLeastSquares newPoints
+
         newCO2 =
-            { co2 | points = newPoints }
+            case fit of
+                Ok fitted ->
+                    { co2
+                        | points = newPoints
+                        , slope = fitted.slope
+                        , intercept = fitted.intercept
+                    }
+
+                _ ->
+                    { co2 | points = newPoints }
     in
         { incubation | co2 = newCO2 }
 
@@ -331,8 +339,20 @@ update_incubation_ch4 incubation point =
         newPoints =
             update_point point ch4.points
 
+        fit =
+            fitLineByLeastSquares newPoints
+
         newCH4 =
-            { ch4 | points = newPoints }
+            case fit of
+                Ok fitted ->
+                    { ch4
+                        | points = newPoints
+                        , slope = fitted.slope
+                        , intercept = fitted.intercept
+                    }
+
+                _ ->
+                    { ch4 | points = newPoints }
     in
         { incubation | ch4 = newCH4 }
 
@@ -346,8 +366,20 @@ update_incubation_n2o incubation point =
         newPoints =
             update_point point n2o.points
 
+        fit =
+            fitLineByLeastSquares newPoints
+
         newN2O =
-            { n2o | points = newPoints }
+            case fit of
+                Ok fitted ->
+                    { n2o
+                        | points = newPoints
+                        , slope = fitted.slope
+                        , intercept = fitted.intercept
+                    }
+
+                _ ->
+                    { n2o | points = newPoints }
     in
         { incubation | n2o = newN2O }
 
@@ -364,79 +396,87 @@ swapIncubation model =
         }
 
 
-url : String
-url =
-    "http://localhost:3000/incubation"
-
-
-fetchNextIncubation : Cmd Msg
-fetchNextIncubation =
-    Cmd.none
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    let
-        _ =
-            Debug.log "model" model
-    in
-        case msg of
-            SwitchCO2 point ->
-                let
-                    new_incubation =
-                        update_incubation_co2 model.incubation point
-                in
-                    ( { model | incubation = new_incubation }, Cmd.none )
-
-            SwitchCH4 point ->
-                let
-                    new_incubation =
-                        update_incubation_ch4 model.incubation point
-                in
-                    ( { model | incubation = new_incubation }, Cmd.none )
-
-            SwitchN2O point ->
-                let
-                    new_incubation =
-                        update_incubation_n2o model.incubation point
-                in
-                    ( { model | incubation = new_incubation }, Cmd.none )
-
-            NextIncubation ->
-                let
-                    _ =
-                        Debug.log "Model" model
-                in
-                    ( model, Cmd.none )
-
-            FluxGood incubation ->
-                let
-                    new_model =
-                        swapIncubation model
-                in
-                    ( { new_model | status = Good }, fetchNextIncubation )
-
-            FluxMaybeGood incubation ->
-                let
-                    new_model =
-                        swapIncubation model
-                in
-                    ( { new_model | status = MaybeGood }, fetchNextIncubation )
-
-            FluxBad incubation ->
-                let
-                    new_model =
-                        swapIncubation model
-                in
-                    ( { new_model | status = Bad }, fetchNextIncubation )
-
-
 
 -- VIEW
 
 
-dots : Axis -> Axis -> Msg -> Point -> Svg Msg
-dots x_axis y_axis msg point =
+translateCoords : String
+translateCoords =
+    "translate(20,0)"
+
+
+viewBox_ : Axis -> Axis -> String
+viewBox_ x_axis y_axis =
+    String.concat [ "0 0 ", (toString x_axis.max_extent), " ", (toString y_axis.max_extent) ]
+
+
+drawXAxis : Axis -> Axis -> Svg Msg
+drawXAxis xAxis yAxis =
+    line
+        [ x1 (toString xAxis.min_extent)
+        , x2 (toString xAxis.max_extent)
+        , y1 (toString yAxis.max_extent)
+        , y2 (toString yAxis.max_extent)
+        , stroke "black"
+        , fill "black"
+        ]
+        []
+
+
+drawYAxis : Axis -> Axis -> Svg Msg
+drawYAxis xAxis yAxis =
+    line
+        [ x1 (toString xAxis.min_extent)
+        , x2 (toString xAxis.min_extent)
+        , y1 (toString yAxis.min_extent)
+        , y2 (toString yAxis.max_extent)
+        , stroke "black"
+        , fill "black"
+        ]
+        []
+
+
+drawRegressionLine : Flux -> Svg Msg
+drawRegressionLine flux =
+    let
+        xAxisTransform =
+            axisTransform flux.xAxis
+
+        yAxisTransform =
+            axisTransform flux.yAxis
+    in
+        line
+            [ x1 "0"
+            , x2 (toString (xAxisTransform flux.xAxis.max_value))
+            , y1 (toString (flux.yAxis.max_extent - yAxisTransform flux.intercept))
+            , y2 (toString (yAxisTransform flux.slope * flux.xAxis.max_value))
+            , stroke "black"
+            , fill "black"
+            ]
+            []
+
+
+draw_graph : List (Svg Msg) -> Flux -> Svg Msg
+draw_graph drawing_func flux =
+    svg
+        [ width (toString (flux.xAxis.max_extent + 10))
+        , height (toString (flux.yAxis.max_extent * 2))
+        , viewBox (viewBox_ flux.xAxis flux.yAxis)
+        ]
+        [ g [ transform translateCoords ]
+            [ g []
+                drawing_func
+            , g [] [ (drawRegressionLine flux) ]
+            , g []
+                [ drawXAxis flux.xAxis flux.yAxis
+                , drawYAxis flux.xAxis flux.yAxis
+                ]
+            ]
+        ]
+
+
+dot : Axis -> Axis -> Msg -> Point -> Svg Msg
+dot x_axis yAxis msg point =
     let
         color =
             pointColor point.deleted
@@ -444,12 +484,12 @@ dots x_axis y_axis msg point =
         x_axis_transform =
             axisTransform x_axis
 
-        y_axis_transform =
-            axisTransform y_axis
+        yAxis_transform =
+            axisTransform yAxis
     in
         circle
             [ cx (toString (x_axis_transform point.x))
-            , cy (toString (y_axis_transform point.y))
+            , cy (toString (yAxis.max_extent - yAxis_transform point.y))
             , r "5"
             , stroke color
             , fill color
@@ -458,43 +498,13 @@ dots x_axis y_axis msg point =
             []
 
 
-draw_graph : List (Svg Msg) -> Axis -> Axis -> Svg Msg
-draw_graph drawing_func x_axis y_axis =
-    svg
-        [ width (toString x_axis.max_extent)
-        , height (toString y_axis.max_extent)
-        , viewBox (viewBox_ x_axis y_axis)
-        ]
-        [ g [ transform (translateCoords y_axis) ]
-            drawing_func
-        ]
-
-
-co2_dots : Axis -> Axis -> List Point -> List (Svg Msg)
-co2_dots x_axis y_axis points =
+dots : (Point -> Msg) -> Axis -> Axis -> List Point -> List (Svg Msg)
+dots msg xAxis yAxis points =
     let
-        dots_transform =
-            dots x_axis y_axis
+        dotTransform =
+            dot xAxis yAxis
     in
-        List.map (\x -> dots_transform (SwitchCO2 x) x) points
-
-
-ch4_dots : Axis -> Axis -> List Point -> List (Svg Msg)
-ch4_dots x_axis y_axis points =
-    let
-        dots_transform =
-            dots x_axis y_axis
-    in
-        List.map (\x -> dots_transform (SwitchCH4 x) x) points
-
-
-n2o_dots : Axis -> Axis -> List Point -> List (Svg Msg)
-n2o_dots x_axis y_axis points =
-    let
-        dots_transform =
-            dots x_axis y_axis
-    in
-        List.map (\x -> dots_transform (SwitchN2O x) x) points
+        List.map (\x -> dotTransform (msg x) x) points
 
 
 view : Model -> Html Msg
@@ -510,19 +520,19 @@ view model =
             model.incubation.ch4
 
         dots_n2o =
-            n2o_dots n2o.xAxis n2o.yAxis n2o.points
+            dots SwitchN2O n2o.xAxis n2o.yAxis n2o.points
 
         dots_co2 =
-            co2_dots co2.xAxis co2.yAxis co2.points
+            dots SwitchCO2 co2.xAxis co2.yAxis co2.points
 
         dots_ch4 =
-            ch4_dots ch4.xAxis ch4.yAxis ch4.points
+            dots SwitchCH4 ch4.xAxis ch4.yAxis ch4.points
     in
         div []
             [ div []
-                [ draw_graph dots_co2 co2.xAxis co2.yAxis
-                , draw_graph dots_ch4 ch4.xAxis ch4.yAxis
-                , draw_graph dots_n2o n2o.xAxis n2o.yAxis
+                [ draw_graph dots_co2 co2
+                , draw_graph dots_ch4 ch4
+                , draw_graph dots_n2o n2o
                 ]
             , button [ onClick (FluxGood model.incubation) ] [ Html.text "Good" ]
             , button [ onClick (FluxMaybeGood model.incubation) ] [ Html.text "Maybe" ]
@@ -530,9 +540,82 @@ view model =
             ]
 
 
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
+
+-- update
+
+
+url : String
+url =
+    "http://localhost:4000/api/injections?incubation_id=35191"
+
+
+fetchNextIncubation : Cmd Msg
+fetchNextIncubation =
+    Http.get url responseDecoder
+        |> Http.send LoadIncubation
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        SwitchCO2 point ->
+            let
+                new_incubation =
+                    update_incubation_co2 model.incubation point
+            in
+                ( { model | incubation = new_incubation }, Cmd.none )
+
+        SwitchCH4 point ->
+            let
+                new_incubation =
+                    update_incubation_ch4 model.incubation point
+            in
+                ( { model | incubation = new_incubation }, Cmd.none )
+
+        SwitchN2O point ->
+            let
+                new_incubation =
+                    update_incubation_n2o model.incubation point
+            in
+                ( { model | incubation = new_incubation }, Cmd.none )
+
+        FluxGood incubation ->
+            let
+                new_model =
+                    swapIncubation model
+            in
+                ( { new_model | status = Good }, fetchNextIncubation )
+
+        FluxMaybeGood incubation ->
+            let
+                new_model =
+                    swapIncubation model
+            in
+                ( { new_model | status = MaybeGood }, fetchNextIncubation )
+
+        FluxBad incubation ->
+            let
+                new_model =
+                    swapIncubation model
+            in
+                ( { new_model | status = Bad }, fetchNextIncubation )
+
+        LoadIncubation (Ok injections) ->
+            let
+                _ =
+                    Debug.log "ok incubation" injections
+
+                newModel =
+                    Debug.log "new model" { model | next_incubation = (toIncubation injections) }
+            in
+                ( newModel, Cmd.none )
+
+        LoadIncubation (Err message) ->
+            let
+                _ =
+                    Debug.log "Error" message
+            in
+                ( model, Cmd.none )
 
 
 init : ( Model, Cmd Msg )
@@ -545,6 +628,6 @@ main =
     Html.program
         { init = init
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = (\_ -> Sub.none)
         , view = view
         }
