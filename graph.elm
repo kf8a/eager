@@ -320,10 +320,16 @@ standardDecoder =
         |> required "ch4_mv" float
 
 
+standardDataDecoder : Decoder (List Standard)
+standardDataDecoder =
+    decode identity
+        |> required "standards" (list standardDecoder)
+
+
 standardResponseDecoder : Decoder (List Standard)
 standardResponseDecoder =
     decode identity
-        |> required "data" (list standardDecoder)
+        |> required "data" standardDataDecoder
 
 
 
