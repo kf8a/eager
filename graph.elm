@@ -31,6 +31,27 @@ type alias Incubation =
     , ch4 : Flux
     , n2o : Flux
     , injections : List Injection
+    , standards : List Standard
+    , co2_calibration : Calibration
+    , ch4_calibration : Calibration
+    , n2o_calibration : Calibration
+    }
+
+
+type alias Standard =
+    { n2o_ppm : Float
+    , n2o_mv : Float
+    , co2_ppm : Float
+    , co2_mv : Float
+    , ch4_ppm : Float
+    , ch4_mv : Float
+    }
+
+
+type alias Calibration =
+    { slope : Float
+    , intercept : Float
+    , r2 : Float
     }
 
 
@@ -74,14 +95,43 @@ type Msg
     | FluxMaybeGood Incubation
     | FluxBad Incubation
     | LoadIncubation (Result Http.Error (List Injection))
+    | LoadStandard (Result Http.Error (List Standard))
 
 
 initialModel : Model
 initialModel =
-    { incubation = toIncubation (decodeInjections SampleIncubation.json)
-    , next_incubation = toIncubation (decodeInjections SampleIncubation.nextJson)
+    { incubation =
+        toIncubation (decodeInjections SampleIncubation.json)
+            initialStandards
+    , next_incubation =
+        toIncubation (decodeInjections SampleIncubation.nextJson)
+            initialStandards
     , status = NotChecked
     }
+
+
+initialCalibration : Calibration
+initialCalibration =
+    { slope = 1.0
+    , intercept = 0.0
+    , r2 = 0.5
+    }
+
+
+initialStandard : Standard
+initialStandard =
+    { n2o_ppm = 0.3
+    , n2o_mv = 100
+    , co2_ppm = 500
+    , co2_mv = 1000
+    , ch4_ppm = 2.0
+    , ch4_mv = 50.0
+    }
+
+
+initialStandards : List Standard
+initialStandards =
+    [ initialStandard ]
 
 
 sortedRecords : Injection -> Injection -> Order
@@ -146,8 +196,8 @@ fluxWithDefault fit xAxis yAxis points =
                 Flux points xAxis yAxis 0 0
 
 
-toIncubation : List Injection -> Incubation
-toIncubation injections =
+toIncubation : List Injection -> List Standard -> Incubation
+toIncubation injections standards =
     let
         startTime =
             initialTime injections
@@ -203,7 +253,14 @@ toIncubation injections =
         n2os =
             fluxWithDefault fitn2o xAxis (yAxis (maxY n2oPoints)) n2oPoints
     in
-        Incubation co2s ch4s n2os injections
+        Incubation co2s
+            ch4s
+            n2os
+            injections
+            initialStandards
+            initialCalibration
+            initialCalibration
+            initialCalibration
 
 
 
@@ -250,6 +307,23 @@ decodeInjections json =
 
         Err msg ->
             []
+
+
+standardDecoder : Decoder Standard
+standardDecoder =
+    decode Standard
+        |> required "n2o_ppm" float
+        |> required "n2o_mv" float
+        |> required "co2_ppm" float
+        |> required "co2_mv" float
+        |> required "ch4_ppm" float
+        |> required "ch4_mv" float
+
+
+standardResponseDecoder : Decoder (List Standard)
+standardResponseDecoder =
+    decode identity
+        |> required "data" (list standardDecoder)
 
 
 
@@ -534,9 +608,15 @@ view model =
                 , draw_graph dots_ch4 ch4
                 , draw_graph dots_n2o n2o
                 ]
-            , button [ onClick (FluxGood model.incubation) ] [ Html.text "Good" ]
-            , button [ onClick (FluxMaybeGood model.incubation) ] [ Html.text "Maybe" ]
-            , button [ onClick (FluxBad model.incubation) ] [ Html.text "Bad" ]
+            , button
+                [ onClick (FluxGood model.incubation) ]
+                [ Html.text "Good" ]
+            , button
+                [ onClick (FluxMaybeGood model.incubation) ]
+                [ Html.text "Maybe" ]
+            , button
+                [ onClick (FluxBad model.incubation) ]
+                [ Html.text "Bad" ]
             ]
 
 
@@ -547,6 +627,17 @@ view model =
 url : String
 url =
     "http://localhost:4000/api/injections?incubation_id=35191"
+
+
+standardUrl : String
+standardUrl =
+    "http://localhost:4000/api/standard_curves/1"
+
+
+fetchStandard : Cmd Msg
+fetchStandard =
+    Http.get standardUrl standardResponseDecoder
+        |> Http.send LoadStandard
 
 
 fetchNextIncubation : Cmd Msg
@@ -606,7 +697,7 @@ update msg model =
                     Debug.log "ok incubation" injections
 
                 newModel =
-                    Debug.log "new model" { model | next_incubation = (toIncubation injections) }
+                    Debug.log "new model" { model | next_incubation = (toIncubation injections initialStandards) }
             in
                 ( newModel, Cmd.none )
 
@@ -614,6 +705,20 @@ update msg model =
             let
                 _ =
                     Debug.log "Error" message
+            in
+                ( model, Cmd.none )
+
+        LoadStandard (Err message) ->
+            let
+                _ =
+                    Debug.log "Error" message
+            in
+                ( model, Cmd.none )
+
+        LoadStandard (Ok standards) ->
+            let
+                _ =
+                    Debug.log "ok standards" standards
             in
                 ( model, Cmd.none )
 
