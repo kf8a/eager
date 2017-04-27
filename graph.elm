@@ -45,6 +45,7 @@ type alias Standard =
     , co2_mv : Float
     , ch4_ppm : Float
     , ch4_mv : Float
+    , id : Int
     }
 
 
@@ -53,6 +54,16 @@ type alias Calibration =
     , intercept : Float
     , r2 : Float
     }
+
+
+
+-- { points : List Point
+-- , xAxis : Axis
+-- , yAxis : Axis
+-- , slope : Float
+-- , intercept : Float
+-- , r2 : Float
+-- }
 
 
 type alias Axis =
@@ -126,6 +137,7 @@ initialStandard =
     , co2_mv = 1000
     , ch4_ppm = 2.0
     , ch4_mv = 50.0
+    , id = 0
     }
 
 
@@ -309,6 +321,16 @@ decodeInjections json =
             []
 
 
+decodeStandards : String -> List Standard
+decodeStandards json =
+    case decodeString standardResponseDecoder json of
+        Ok standards ->
+            standards
+
+        Err msg ->
+            []
+
+
 standardDecoder : Decoder Standard
 standardDecoder =
     decode Standard
@@ -318,6 +340,7 @@ standardDecoder =
         |> required "co2_mv" float
         |> required "ch4_ppm" float
         |> required "ch4_mv" float
+        |> required "id" int
 
 
 standardDataDecoder : Decoder (List Standard)
@@ -536,6 +559,31 @@ drawRegressionLine flux =
             []
 
 
+co2_standards : List Standard -> List Point
+co2_standards standards =
+    List.map (\x -> Point x.co2_ppm x.co2_mv False x.id) standards
+
+
+n2o_standards : List Standard -> List Point
+n2o_standards standards =
+    List.map (\x -> Point x.n2o_ppm x.n2o_mv False x.id) standards
+
+
+ch4_standards : List Standard -> List Point
+ch4_standards standards =
+    List.map (\x -> Point x.ch4_ppm x.ch4_mv False x.id) standards
+
+
+draw_standards : List Standard -> Svg Msg
+draw_standards standards =
+    svg
+        [ width "200"
+        , height "100"
+        , viewBox "0 0 200 100"
+        ]
+        [ g [] [] ]
+
+
 draw_graph : List (Svg Msg) -> Flux -> Svg Msg
 draw_graph drawing_func flux =
     svg
@@ -610,6 +658,8 @@ view model =
     in
         div []
             [ div []
+                [ draw_standards model.incubation.standards ]
+            , div []
                 [ draw_graph dots_co2 co2
                 , draw_graph dots_ch4 ch4
                 , draw_graph dots_n2o n2o
@@ -731,4 +781,4 @@ update msg model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel, Cmd.none )
+    ( initialModel, fetchStandard )
