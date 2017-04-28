@@ -19,10 +19,9 @@ import SampleIncubation exposing (json, nextJson)
 
 type alias Flux =
     { points : List Point
-    , xAxis : Axis
-    , yAxis : Axis
     , slope : Float
     , intercept : Float
+    , r2 : Float
     }
 
 
@@ -32,9 +31,9 @@ type alias Incubation =
     , n2o : Flux
     , injections : List Injection
     , standards : List Standard
-    , co2_calibration : Calibration
-    , ch4_calibration : Calibration
-    , n2o_calibration : Calibration
+    , co2_calibration : Flux
+    , ch4_calibration : Flux
+    , n2o_calibration : Flux
     }
 
 
@@ -47,23 +46,6 @@ type alias Standard =
     , ch4_mv : Float
     , id : Int
     }
-
-
-type alias Calibration =
-    { slope : Float
-    , intercept : Float
-    , r2 : Float
-    }
-
-
-
--- { points : List Point
--- , xAxis : Axis
--- , yAxis : Axis
--- , slope : Float
--- , intercept : Float
--- , r2 : Float
--- }
 
 
 type alias Axis =
@@ -129,14 +111,6 @@ initialModel =
     }
 
 
-initialCalibration : Calibration
-initialCalibration =
-    { slope = 1.0
-    , intercept = 0.0
-    , r2 = 0.5
-    }
-
-
 initialStandard : Standard
 initialStandard =
     { n2o_ppm = 0.3
@@ -152,11 +126,6 @@ initialStandard =
 initialStandards : List Standard
 initialStandards =
     [ initialStandard ]
-
-
-initialAxis : Axis
-initialAxis =
-    Axis 0 200 0 9000
 
 
 sortedRecords : Injection -> Injection -> Order
@@ -207,18 +176,18 @@ updateInjection injections id active =
         List.concat [ rest, newIncubation ]
 
 
-fluxWithDefault : Result String Fit -> Axis -> Axis -> List Point -> Flux
-fluxWithDefault fit xAxis yAxis points =
+fluxWithDefault : Result String Fit -> List Point -> Flux
+fluxWithDefault fit points =
     case fit of
         Ok fit ->
-            Flux points xAxis yAxis fit.slope fit.intercept
+            Flux points fit.slope fit.intercept fit.r2
 
         Err message ->
             let
                 _ =
                     Debug.log "Fit Error " message
             in
-                Flux points xAxis yAxis 0 0
+                Flux points 0 0 0
 
 
 toIncubation : List Injection -> List Standard -> Incubation
@@ -230,12 +199,6 @@ toIncubation injections standards =
         pointInterval =
             interval startTime
 
-        xAxis =
-            Axis 0 200 0 200
-
-        yAxis =
-            Axis 0 120 0
-
         co2Points =
             List.map
                 (\x ->
@@ -246,11 +209,8 @@ toIncubation injections standards =
         fit =
             fitLineByLeastSquares co2Points
 
-        maxYco2 =
-            maxY co2Points
-
         co2s =
-            fluxWithDefault fit xAxis (yAxis (maxY co2Points)) co2Points
+            fluxWithDefault fit co2Points
 
         ch4Points =
             List.map
@@ -263,7 +223,7 @@ toIncubation injections standards =
             fitLineByLeastSquares ch4Points
 
         ch4s =
-            fluxWithDefault fitch4 xAxis (yAxis (maxY ch4Points)) ch4Points
+            fluxWithDefault fitch4 ch4Points
 
         n2oPoints =
             List.map
@@ -276,16 +236,17 @@ toIncubation injections standards =
             fitLineByLeastSquares n2oPoints
 
         n2os =
-            fluxWithDefault fitn2o xAxis (yAxis (maxY n2oPoints)) n2oPoints
+            fluxWithDefault fitn2o n2oPoints
     in
-        Incubation co2s
+        Incubation
+            co2s
             ch4s
             n2os
             injections
             initialStandards
-            initialCalibration
-            initialCalibration
-            initialCalibration
+            co2s
+            co2s
+            co2s
 
 
 
@@ -424,6 +385,29 @@ update_point point incubation =
         old_list ++ [ new_point ]
 
 
+update_standards : Gas -> List Standard -> Point -> List Standard
+update_standards gas standards point =
+    let
+        ( rest_of_standards, selected_standard ) =
+            List.partition (\x -> x.id /= point.id) standards
+
+        _ =
+            Debug.log "selected" selected_standard
+
+        newPoint =
+            case gas of
+                CO2 ->
+                    Debug.log "co2" point
+
+                CH4 ->
+                    point
+
+                N2O ->
+                    point
+    in
+        standards
+
+
 update_incubation_co2 : Incubation -> Point -> Incubation
 update_incubation_co2 incubation point =
     let
@@ -557,20 +541,20 @@ drawYAxis xAxis yAxis =
         []
 
 
-drawRegressionLine : Flux -> Svg Msg
-drawRegressionLine flux =
+drawRegressionLine : Axis -> Axis -> Flux -> Svg Msg
+drawRegressionLine xAxis yAxis flux =
     let
         xAxisTransform =
-            axisTransform flux.xAxis
+            axisTransform xAxis
 
         yAxisTransform =
-            axisTransform flux.yAxis
+            axisTransform yAxis
     in
         line
             [ x1 "0"
-            , x2 (toString (xAxisTransform flux.xAxis.max_value))
-            , y1 (toString (flux.yAxis.max_extent - yAxisTransform flux.intercept))
-            , y2 (toString (yAxisTransform flux.slope * flux.xAxis.max_value))
+            , x2 (toString (xAxisTransform xAxis.max_value))
+            , y1 (toString (yAxis.max_extent - yAxisTransform flux.intercept))
+            , y2 (toString (yAxisTransform flux.slope * xAxis.max_value))
             , stroke "black"
             , fill "black"
             ]
@@ -602,13 +586,16 @@ draw_standards gas points =
             maxY points
 
         xAxis =
-            Axis 0 200 0 max_x
+            toXAxis flux
 
         yAxis =
-            Axis 0 200 0 max_y
+            toYAxis flux
+
+        fit =
+            fitLineByLeastSquares points
 
         flux =
-            Flux points xAxis yAxis 0 0
+            fluxWithDefault fit points
 
         my_dots =
             dots2 gas flux
@@ -618,22 +605,28 @@ draw_standards gas points =
 
 draw_graph : List (Svg Msg) -> Flux -> Svg Msg
 draw_graph drawing_func flux =
-    svg
-        [ width (toString (flux.xAxis.max_extent + 10))
-        , height (toString (flux.yAxis.max_extent * 2))
+    let
+        xAxis =
+            toXAxis flux
 
-        -- , viewBox (viewBox_ flux.xAxis flux.yAxis)
-        ]
-        [ g [ transform translateCoords ]
-            [ g []
-                drawing_func
-            , g [] [ (drawRegressionLine flux) ]
-            , g []
-                [ drawXAxis flux.xAxis flux.yAxis
-                , drawYAxis flux.xAxis flux.yAxis
+        yAxis =
+            toYAxis flux
+    in
+        svg
+            [ width (toString (xAxis.max_extent + 10))
+            , height (toString (yAxis.max_extent * 2))
+            , viewBox (viewBox_ xAxis yAxis)
+            ]
+            [ g [ transform translateCoords ]
+                [ g []
+                    drawing_func
+                , g [] [ (drawRegressionLine xAxis yAxis flux) ]
+                , g []
+                    [ drawXAxis xAxis yAxis
+                    , drawYAxis xAxis yAxis
+                    ]
                 ]
             ]
-        ]
 
 
 dot : Axis -> Axis -> Msg -> Point -> Svg Msg
@@ -659,11 +652,21 @@ dot x_axis yAxis msg point =
             []
 
 
+toXAxis : Flux -> Axis
+toXAxis flux =
+    Axis 0 200 0 (maxX flux.points)
+
+
+toYAxis : Flux -> Axis
+toYAxis flux =
+    Axis 0 200 0 (maxY flux.points)
+
+
 dots2 : Gas -> Flux -> List (Svg Msg)
 dots2 gas flux =
     let
         dotTransform =
-            dot flux.xAxis flux.yAxis
+            dot (toXAxis flux) (toYAxis flux)
     in
         List.map (\x -> dotTransform (SwitchPoint gas x) x) flux.points
 
@@ -672,7 +675,7 @@ dots : (Point -> Msg) -> Flux -> List (Svg Msg)
 dots msg flux =
     let
         dotTransform =
-            dot flux.xAxis flux.yAxis
+            dot (toXAxis flux) (toYAxis flux)
     in
         List.map (\x -> dotTransform (msg x) x) flux.points
 
@@ -779,9 +782,8 @@ update msg model =
                 incubation =
                     model.incubation
 
-                standards =
-                    Debug.log "standards"
-                        incubation.standards
+                newStandards =
+                    update_standards CO2 incubation.standards point
             in
                 ( model, Cmd.none )
 
@@ -808,8 +810,7 @@ update msg model =
                     model.incubation
 
                 standards =
-                    Debug.log "standards"
-                        incubation.standards
+                    incubation.standards
             in
                 ( model, Cmd.none )
 
