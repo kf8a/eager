@@ -91,6 +91,12 @@ type alias Injection =
     }
 
 
+type Gas
+    = CO2
+    | N2O
+    | CH4
+
+
 type Status
     = Good
     | Bad
@@ -102,7 +108,7 @@ type Msg
     = SwitchCO2 Point
     | SwitchCH4 Point
     | SwitchN2O Point
-    | SwitchPoint Point
+    | SwitchPoint Gas Point
     | FluxGood Incubation
     | FluxMaybeGood Incubation
     | FluxBad Incubation
@@ -586,13 +592,8 @@ ch4_standards standards =
     List.map (\x -> Point x.ch4_ppm x.ch4_mv False x.id) standards
 
 
-draw_co2_standards : List Standard -> Svg Msg
-draw_co2_standards standards =
-    draw_standards (co2_standards standards)
-
-
-draw_standards : List Point -> Svg Msg
-draw_standards points =
+draw_standards : Gas -> List Point -> Svg Msg
+draw_standards gas points =
     let
         max_x =
             maxX points
@@ -601,16 +602,16 @@ draw_standards points =
             maxY points
 
         xAxis =
-            Debug.log "xAxis" (Axis 0 200 0 max_x)
+            Axis 0 200 0 max_x
 
         yAxis =
-            Debug.log "yaxis" (Axis 0 200 0 max_y)
+            Axis 0 200 0 max_y
 
         flux =
             Flux points xAxis yAxis 0 0
 
         my_dots =
-            dots SwitchPoint flux
+            dots2 gas flux
     in
         draw_graph my_dots flux
 
@@ -658,6 +659,15 @@ dot x_axis yAxis msg point =
             []
 
 
+dots2 : Gas -> Flux -> List (Svg Msg)
+dots2 gas flux =
+    let
+        dotTransform =
+            dot flux.xAxis flux.yAxis
+    in
+        List.map (\x -> dotTransform (SwitchPoint gas x) x) flux.points
+
+
 dots : (Point -> Msg) -> Flux -> List (Svg Msg)
 dots msg flux =
     let
@@ -690,9 +700,9 @@ view model =
     in
         div []
             [ div []
-                [ draw_standards (n2o_standards model.incubation.standards)
-                , draw_standards (co2_standards model.incubation.standards)
-                , draw_standards (ch4_standards model.incubation.standards)
+                [ draw_standards N2O (n2o_standards model.incubation.standards)
+                , draw_standards CO2 (co2_standards model.incubation.standards)
+                , draw_standards CH4 (ch4_standards model.incubation.standards)
                 ]
             , div []
                 [ draw_graph dots_co2 co2
@@ -761,8 +771,47 @@ update msg model =
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchPoint point ->
-            ( model, Cmd.none )
+        SwitchPoint CO2 point ->
+            let
+                _ =
+                    Debug.log "CO2 point" point
+
+                incubation =
+                    model.incubation
+
+                standards =
+                    Debug.log "standards"
+                        incubation.standards
+            in
+                ( model, Cmd.none )
+
+        SwitchPoint CH4 point ->
+            let
+                _ =
+                    Debug.log "CH4 point" point
+
+                incubation =
+                    model.incubation
+
+                standards =
+                    Debug.log "standards"
+                        incubation.standards
+            in
+                ( model, Cmd.none )
+
+        SwitchPoint N2O point ->
+            let
+                _ =
+                    Debug.log "N2O point" point
+
+                incubation =
+                    model.incubation
+
+                standards =
+                    Debug.log "standards"
+                        incubation.standards
+            in
+                ( model, Cmd.none )
 
         FluxGood incubation ->
             let
