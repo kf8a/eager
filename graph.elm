@@ -107,6 +107,7 @@ type Msg
     | FluxBad Incubation
     | LoadIncubation (Result Http.Error (List Injection))
     | LoadStandard (Result Http.Error (List Standard))
+    | SaveStandard (List Standard)
 
 
 initialModel : Model
@@ -144,6 +145,11 @@ initialStandard =
 initialStandards : List Standard
 initialStandards =
     [ initialStandard ]
+    
+    
+initialAxis : Axis
+initialAxis =
+  Axis 200 0 0 200
 
 
 sortedRecords : Injection -> Injection -> Order
