@@ -150,7 +150,7 @@ initialStandards =
 
 initialAxis : Axis
 initialAxis =
-    Axis 0 200 0 2000
+    Axis 0 200 0 9000
 
 
 sortedRecords : Injection -> Injection -> Order
@@ -586,19 +586,33 @@ ch4_standards standards =
     List.map (\x -> Point x.ch4_ppm x.ch4_mv False x.id) standards
 
 
-draw_standards : List Standard -> Svg Msg
-draw_standards standards =
+draw_co2_standards : List Standard -> Svg Msg
+draw_co2_standards standards =
+    draw_standards (co2_standards standards)
+
+
+draw_standards : List Point -> Svg Msg
+draw_standards points =
     let
-        points =
-            Debug.log "co2_standards" (co2_standards standards)
+        max_x =
+            maxX points
+
+        max_y =
+            maxY points
+
+        xAxis =
+            Debug.log "xAxis" (Axis 0 200 0 max_x)
+
+        yAxis =
+            Debug.log "yaxis" (Axis 0 200 0 max_y)
 
         flux =
-            Flux points initialAxis initialAxis 0 0
+            Flux points xAxis yAxis 0 0
 
-        co2_dots =
+        my_dots =
             dots SwitchPoint flux
     in
-        draw_graph co2_dots flux
+        draw_graph my_dots flux
 
 
 draw_graph : List (Svg Msg) -> Flux -> Svg Msg
@@ -676,7 +690,9 @@ view model =
     in
         div []
             [ div []
-                [ draw_standards model.incubation.standards
+                [ draw_standards (n2o_standards model.incubation.standards)
+                , draw_standards (co2_standards model.incubation.standards)
+                , draw_standards (ch4_standards model.incubation.standards)
                 ]
             , div []
                 [ draw_graph dots_co2 co2
@@ -795,19 +811,13 @@ update msg model =
 
         LoadStandard (Ok standards) ->
             let
-                _ =
-                    Debug.log "ok standards" standards
-
                 incubation =
                     model.incubation
 
                 newIncubation =
                     { incubation | standards = standards }
-
-                newModel =
-                    Debug.log "new model" { model | incubation = newIncubation }
             in
-                ( newModel, Cmd.none )
+                ( { model | incubation = newIncubation }, Cmd.none )
 
         SaveStandard standards ->
             ( model, Cmd.none )

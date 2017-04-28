@@ -13,7 +13,7 @@ all : Test
 all =
     describe "the graph module"
         [ describe "axis transform"
-            [ fuzz (floatRange 0 100) "it returns the scaled values for in range values" <|
+            [ fuzz (floatRange 0 100) "it scales the scaled values for in range values" <|
                 \value ->
                     let
                         axis =
@@ -21,6 +21,17 @@ all =
                     in
                         axisTransform axis value
                             |> Expect.equal (value / 2)
+            , fuzz float "it retuns a value in the extent range" <|
+                \value ->
+                    let
+                        axis =
+                            Axis 0 60 0 100
+
+                        output =
+                            axisTransform axis value
+                    in
+                        ((output >= 0) && (output <= 60))
+                            |> Expect.true "Expected result be within extent range"
             , fuzz (floatRange 101 1000) "it retuns the upper range if above range" <|
                 \value ->
                     let
