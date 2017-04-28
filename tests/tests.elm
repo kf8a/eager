@@ -12,7 +12,33 @@ import LeastSquares exposing (..)
 all : Test
 all =
     describe "the graph module"
-        [ describe "the standard filters to points"
+        [ describe "axis transform"
+            [ fuzz (floatRange 0 100) "it returns the scaled values for in range values" <|
+                \value ->
+                    let
+                        axis =
+                            Axis 0 50 0 100
+                    in
+                        axisTransform axis value
+                            |> Expect.equal (value / 2)
+            , fuzz (floatRange 101 1000) "it retuns the upper range if above range" <|
+                \value ->
+                    let
+                        axis =
+                            Axis 0 60 0 100
+                    in
+                        axisTransform axis value
+                            |> Expect.equal 60
+            , fuzz (floatRange -101 0) "it retuns the lower range if below range" <|
+                \value ->
+                    let
+                        axis =
+                            Axis 0 60 0 100
+                    in
+                        axisTransform axis value
+                            |> Expect.equal 0
+            ]
+        , describe "the standard filters to points"
             [ test "it grabs the right co2 parameters" <|
                 \() ->
                     let

@@ -67,8 +67,8 @@ type alias Calibration =
 
 
 type alias Axis =
-    { max_extent : Float
-    , min_extent : Float
+    { min_extent : Float
+    , max_extent : Float
     , min_value : Float
     , max_value : Float
     }
@@ -102,6 +102,7 @@ type Msg
     = SwitchCO2 Point
     | SwitchCH4 Point
     | SwitchN2O Point
+    | SwitchPoint Point
     | FluxGood Incubation
     | FluxMaybeGood Incubation
     | FluxBad Incubation
@@ -145,11 +146,11 @@ initialStandard =
 initialStandards : List Standard
 initialStandards =
     [ initialStandard ]
-    
-    
+
+
 initialAxis : Axis
 initialAxis =
-  Axis 200 0 0 200
+    Axis 0 200 0 2000
 
 
 sortedRecords : Injection -> Injection -> Order
@@ -224,10 +225,10 @@ toIncubation injections standards =
             interval startTime
 
         xAxis =
-            Axis 200 0 0 200
+            Axis 0 200 0 200
 
         yAxis =
-            Axis 120 0 0
+            Axis 0 120 0
 
         co2Points =
             List.map
@@ -387,7 +388,12 @@ maxX points =
 
 axisTransform : Axis -> Float -> Float
 axisTransform axis value =
-    (axis.max_extent / (axis.max_value - axis.min_value) * value)
+    if value > axis.max_value then
+        axis.max_extent
+    else if value < axis.min_value then
+        axis.min_extent
+    else
+        (axis.max_extent / (axis.max_value - axis.min_value) * value)
 
 
 pointColor : Bool -> String
@@ -582,12 +588,17 @@ ch4_standards standards =
 
 draw_standards : List Standard -> Svg Msg
 draw_standards standards =
-    svg
-        [ width "200"
-        , height "100"
-        , viewBox "0 0 200 100"
-        ]
-        [ g [] [] ]
+    let
+        points =
+            Debug.log "co2_standards" (co2_standards standards)
+
+        flux =
+            Flux points initialAxis initialAxis 0 0
+
+        co2_dots =
+            dots SwitchPoint flux
+    in
+        draw_graph co2_dots flux
 
 
 draw_graph : List (Svg Msg) -> Flux -> Svg Msg
@@ -595,7 +606,8 @@ draw_graph drawing_func flux =
     svg
         [ width (toString (flux.xAxis.max_extent + 10))
         , height (toString (flux.yAxis.max_extent * 2))
-        , viewBox (viewBox_ flux.xAxis flux.yAxis)
+
+        -- , viewBox (viewBox_ flux.xAxis flux.yAxis)
         ]
         [ g [ transform translateCoords ]
             [ g []
@@ -632,13 +644,13 @@ dot x_axis yAxis msg point =
             []
 
 
-dots : (Point -> Msg) -> Axis -> Axis -> List Point -> List (Svg Msg)
-dots msg xAxis yAxis points =
+dots : (Point -> Msg) -> Flux -> List (Svg Msg)
+dots msg flux =
     let
         dotTransform =
-            dot xAxis yAxis
+            dot flux.xAxis flux.yAxis
     in
-        List.map (\x -> dotTransform (msg x) x) points
+        List.map (\x -> dotTransform (msg x) x) flux.points
 
 
 view : Model -> Html Msg
@@ -654,17 +666,18 @@ view model =
             model.incubation.ch4
 
         dots_n2o =
-            dots SwitchN2O n2o.xAxis n2o.yAxis n2o.points
+            dots SwitchN2O n2o
 
         dots_co2 =
-            dots SwitchCO2 co2.xAxis co2.yAxis co2.points
+            dots SwitchCO2 co2
 
         dots_ch4 =
-            dots SwitchCH4 ch4.xAxis ch4.yAxis ch4.points
+            dots SwitchCH4 ch4
     in
         div []
             [ div []
-                [ draw_standards model.incubation.standards ]
+                [ draw_standards model.incubation.standards
+                ]
             , div []
                 [ draw_graph dots_co2 co2
                 , draw_graph dots_ch4 ch4
@@ -732,6 +745,9 @@ update msg model =
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
+        SwitchPoint point ->
+            ( model, Cmd.none )
+
         FluxGood incubation ->
             let
                 new_model =
@@ -781,8 +797,20 @@ update msg model =
             let
                 _ =
                     Debug.log "ok standards" standards
+
+                incubation =
+                    model.incubation
+
+                newIncubation =
+                    { incubation | standards = standards }
+
+                newModel =
+                    Debug.log "new model" { model | incubation = newIncubation }
             in
-                ( model, Cmd.none )
+                ( newModel, Cmd.none )
+
+        SaveStandard standards ->
+            ( model, Cmd.none )
 
 
 init : ( Model, Cmd Msg )
