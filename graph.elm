@@ -183,11 +183,7 @@ fluxWithDefault fit points =
             Flux points fit.slope fit.intercept fit.r2
 
         Err message ->
-            let
-                _ =
-                    Debug.log "Fit Error " message
-            in
-                Flux points 0 0 0
+            Flux points 0 0 0
 
 
 toIncubation : List Injection -> List Standard -> Incubation
@@ -551,10 +547,10 @@ drawRegressionLine xAxis yAxis flux =
             axisTransform yAxis
     in
         line
-            [ x1 "0"
+            [ x1 (toString (xAxisTransform xAxis.min_value))
             , x2 (toString (xAxisTransform xAxis.max_value))
-            , y1 (toString (yAxis.max_extent - yAxisTransform flux.intercept))
-            , y2 (toString (yAxisTransform flux.slope * xAxis.max_value))
+            , y1 (toString (yAxis.max_extent - (yAxisTransform flux.intercept)))
+            , y2 (toString (yAxis.max_extent - (yAxisTransform flux.slope) * xAxis.max_value))
             , stroke "black"
             , fill "black"
             ]
@@ -591,11 +587,16 @@ draw_standards gas points =
         yAxis =
             toYAxis flux
 
+        _ =
+            Debug.log "points" points
+
         fit =
-            fitLineByLeastSquares points
+            Debug.log "fit"
+                (fitLineByLeastSquares points)
 
         flux =
-            fluxWithDefault fit points
+            Debug.log "flux"
+                (fluxWithDefault fit points)
 
         my_dots =
             dots2 gas flux

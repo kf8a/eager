@@ -52,7 +52,7 @@ fitLineByLeastSquares points =
         r2 =
             correlation * correlation
     in
-        if count > 2 then
+        if count >= 2 then
             Ok (Fit slope intercept r2)
         else
             Err "regression failed"

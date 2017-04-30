@@ -12,7 +12,28 @@ import LeastSquares exposing (..)
 all : Test
 all =
     describe "the graph module"
-        [ describe "axis transform"
+        [ describe "least squares fit"
+            [ test "simple fit" <|
+                \() ->
+                    let
+                        points =
+                            [ Point 0 0 False 1
+                            , Point 1 1 False 2
+                            ]
+
+                        result =
+                            fitLineByLeastSquares points
+                    in
+                        case result of
+                            Ok fit ->
+                                fit.slope
+                                    |> Expect.equal 1
+
+                            Err msg ->
+                                msg
+                                    |> Expect.equal "error"
+            ]
+        , describe "axis transform"
             [ fuzz (floatRange 0 100) "it scales the scaled values for in range values" <|
                 \value ->
                     let
