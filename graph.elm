@@ -91,10 +91,8 @@ type Status
 
 
 type Msg
-    = SwitchCO2 Point
-    | SwitchCH4 Point
-    | SwitchN2O Point
-    | SwitchPoint Gas Point
+    = SwitchInjection Gas Point
+    | SwitchStandard Gas Point
     | FluxGood Incubation
     | FluxMaybeGood Incubation
     | FluxBad Incubation
@@ -165,7 +163,7 @@ co2_injections injections =
         pointInterval =
             interval (initialTime injections)
     in
-        List.map (\x -> Point x.co2_ppm (pointInterval x.datetime) False x.id) injections
+        List.map (\x -> Point x.co2_ppm (pointInterval x.datetime) x.co2_deleted x.id) injections
 
 
 n2o_injections : List Injection -> List Point
@@ -174,7 +172,7 @@ n2o_injections injections =
         pointInterval =
             interval (initialTime injections)
     in
-        List.map (\x -> Point x.n2o_ppm (pointInterval x.datetime) False x.id) injections
+        List.map (\x -> Point x.n2o_ppm (pointInterval x.datetime) x.n2o_deleted x.id) injections
 
 
 ch4_injections : List Injection -> List Point
@@ -183,7 +181,7 @@ ch4_injections injections =
         pointInterval =
             interval (initialTime injections)
     in
-        List.map (\x -> Point x.ch4_ppm (pointInterval x.datetime) False x.id) injections
+        List.map (\x -> Point x.ch4_ppm (pointInterval x.datetime) x.ch4_deleted x.id) injections
 
 
 
@@ -321,8 +319,24 @@ updateN2OInjection injection n2o =
             injection
 
 
-update_co2_injection : List Injection -> Point -> List Injection
-update_co2_injection injections co2 =
+updateCH4Injection : Injection -> Point -> Injection
+updateCH4Injection injection ch4 =
+    if ch4.id == injection.id then
+        { injection | ch4_ppm = ch4.x, ch4_deleted = ch4.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString ch4, " did not match any id in " ]
+
+            _ =
+                Debug.log msg injection
+        in
+            injection
+
+
+update_co2_injections : List Injection -> Point -> List Injection
+update_co2_injections injections co2 =
     let
         ( injection, rest ) =
             List.partition (\x -> x.id == co2.id) injections
@@ -338,91 +352,38 @@ update_co2_injection injections co2 =
         rest ++ newInjection
 
 
-update_incubation_co2 : Incubation -> Point -> Incubation
-update_incubation_co2 incubation point =
+update_ch4_injections : List Injection -> Point -> List Injection
+update_ch4_injections injections ch4 =
     let
-        co2 =
-            incubation.co2
+        ( injection, rest ) =
+            List.partition (\x -> x.id == ch4.id) injections
 
-        newPoints =
-            update_point point (co2_injections incubation.injections)
+        newInjection =
+            case (List.head injection) of
+                Just myInjection ->
+                    [ updateCH4Injection myInjection ch4 ]
 
-        fit =
-            fitLineByLeastSquares newPoints
-
-        newCO2 =
-            case fit of
-                Ok fitted ->
-                    { co2
-                        | slope = fitted.slope
-                        , intercept = fitted.intercept
-                    }
-
-                Err msg ->
-                    let
-                        _ =
-                            Debug.log "ERROR: " msg
-                    in
-                        co2
+                Nothing ->
+                    []
     in
-        { incubation | co2 = newCO2 }
+        rest ++ newInjection
 
 
-update_incubation_ch4 : Incubation -> Point -> Incubation
-update_incubation_ch4 incubation point =
+update_n2o_injections : List Injection -> Point -> List Injection
+update_n2o_injections injections n2o =
     let
-        ch4 =
-            incubation.ch4
+        ( injection, rest ) =
+            List.partition (\x -> x.id == n2o.id) injections
 
-        newPoints =
-            update_point point (ch4_injections incubation.injections)
+        newInjection =
+            case (List.head injection) of
+                Just myInjection ->
+                    [ updateN2OInjection myInjection n2o ]
 
-        fit =
-            fitLineByLeastSquares newPoints
-
-        newCH4 =
-            case fit of
-                Ok fitted ->
-                    { ch4 | slope = fitted.slope, intercept = fitted.intercept }
-
-                Err msg ->
-                    let
-                        _ =
-                            Debug.log "ERROR: " msg
-                    in
-                        ch4
+                Nothing ->
+                    []
     in
-        { incubation | ch4 = newCH4 }
-
-
-update_incubation_n2o : Incubation -> Point -> Incubation
-update_incubation_n2o incubation point =
-    let
-        n2o =
-            incubation.n2o
-
-        newPoints =
-            update_point point (n2o_injections incubation.injections)
-
-        fit =
-            fitLineByLeastSquares newPoints
-
-        newN2O =
-            case fit of
-                Ok fitted ->
-                    { n2o
-                        | slope = fitted.slope
-                        , intercept = fitted.intercept
-                    }
-
-                Err msg ->
-                    let
-                        _ =
-                            Debug.log "ERROR: " msg
-                    in
-                        n2o
-    in
-        { incubation | n2o = newN2O }
+        rest ++ newInjection
 
 
 
@@ -657,7 +618,7 @@ translateCoords =
 
 viewBox_ : Axis -> Axis -> String
 viewBox_ x_axis y_axis =
-    String.concat [ "0 0 ", (toString x_axis.max_extent), " ", (toString y_axis.max_extent) ]
+    String.concat [ "0 0 ", (toString (x_axis.max_extent + 20)), " ", (toString y_axis.max_extent) ]
 
 
 drawXAxis : Axis -> Axis -> Svg Msg
@@ -728,7 +689,34 @@ draw_standards gas points =
             fluxWithDefault fit
 
         my_dots =
-            dots2 gas points
+            standardDots gas points
+    in
+        draw_graph my_dots points flux
+
+
+draw_injections : Gas -> List Point -> Svg Msg
+draw_injections gas points =
+    let
+        max_x =
+            maxX points
+
+        max_y =
+            maxY points
+
+        xAxis =
+            toXAxis points
+
+        yAxis =
+            toYAxis points
+
+        fit =
+            fitLineByLeastSquares points
+
+        flux =
+            fluxWithDefault fit
+
+        my_dots =
+            injectionDots gas points
     in
         draw_graph my_dots points flux
 
@@ -792,66 +780,47 @@ toYAxis points =
     Axis 0 200 0 (maxY points)
 
 
-dots2 : Gas -> List Point -> List (Svg Msg)
-dots2 gas points =
+standardDots : Gas -> List Point -> List (Svg Msg)
+standardDots gas points =
     let
         dotTransform =
             dot (toXAxis points) (toYAxis points)
     in
-        List.map (\x -> dotTransform (SwitchPoint gas x) x) points
+        List.map (\x -> dotTransform (SwitchStandard gas x) x) points
 
 
-dots : (Point -> Msg) -> List Point -> List (Svg Msg)
-dots msg points =
+injectionDots : Gas -> List Point -> List (Svg Msg)
+injectionDots gas points =
     let
         dotTransform =
             dot (toXAxis points) (toYAxis points)
     in
-        List.map (\x -> dotTransform (msg x) x) points
+        List.map (\x -> dotTransform (SwitchInjection gas x) x) points
 
 
 view : Model -> Html Msg
 view model =
-    let
-        n2o =
-            n2o_injections model.incubation.injections
-
-        co2 =
-            co2_injections model.incubation.injections
-
-        ch4 =
-            ch4_injections model.incubation.injections
-
-        dots_n2o =
-            dots SwitchN2O n2o
-
-        dots_co2 =
-            dots SwitchCO2 co2
-
-        dots_ch4 =
-            dots SwitchCH4 ch4
-    in
-        div []
-            [ div []
-                [ draw_standards N2O (n2o_standards model.incubation.standards)
-                , draw_standards CO2 (co2_standards model.incubation.standards)
-                , draw_standards CH4 (ch4_standards model.incubation.standards)
-                ]
-            , div []
-                [ draw_graph dots_co2 co2 model.incubation.co2
-                , draw_graph dots_ch4 ch4 model.incubation.ch4
-                , draw_graph dots_n2o n2o model.incubation.n2o
-                ]
-            , button
-                [ onClick (FluxGood model.incubation) ]
-                [ Html.text "Good" ]
-            , button
-                [ onClick (FluxMaybeGood model.incubation) ]
-                [ Html.text "Maybe" ]
-            , button
-                [ onClick (FluxBad model.incubation) ]
-                [ Html.text "Bad" ]
+    div []
+        [ div []
+            [ draw_standards N2O (n2o_standards model.incubation.standards)
+            , draw_standards CO2 (co2_standards model.incubation.standards)
+            , draw_standards CH4 (ch4_standards model.incubation.standards)
             ]
+        , div []
+            [ draw_injections N2O (n2o_injections model.incubation.injections)
+            , draw_injections CO2 (co2_injections model.incubation.injections)
+            , draw_injections CH4 (ch4_injections model.incubation.injections)
+            ]
+        , button
+            [ onClick (FluxGood model.incubation) ]
+            [ Html.text "Good" ]
+        , button
+            [ onClick (FluxMaybeGood model.incubation) ]
+            [ Html.text "Maybe" ]
+        , button
+            [ onClick (FluxBad model.incubation) ]
+            [ Html.text "Bad" ]
+        ]
 
 
 
@@ -883,7 +852,7 @@ fetchNextIncubation =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SwitchCO2 point ->
+        SwitchInjection CO2 point ->
             let
                 new_point =
                     { point | deleted = not point.deleted }
@@ -892,28 +861,58 @@ update msg model =
                     model.incubation
 
                 new_injections =
-                    update_co2_injection incubation.injections new_point
+                    update_co2_injections incubation.injections new_point
+
+                new_incubation =
+                    { incubation | injections = new_injections }
+
+                _ =
+                    Debug.log "co2 old " incubation
+
+                _ =
+                    Debug.log "co2 new " new_incubation
+            in
+                ( { model | incubation = new_incubation }, Cmd.none )
+
+        SwitchInjection CH4 point ->
+            let
+                new_point =
+                    { point | deleted = not point.deleted }
+
+                incubation =
+                    model.incubation
+
+                new_injections =
+                    update_ch4_injections incubation.injections new_point
 
                 new_incubation =
                     { incubation | injections = new_injections }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchCH4 point ->
+        SwitchInjection N2O point ->
             let
+                new_point =
+                    { point | deleted = not point.deleted }
+
+                incubation =
+                    model.incubation
+
+                new_injections =
+                    update_n2o_injections incubation.injections new_point
+
                 new_incubation =
-                    update_incubation_ch4 model.incubation point
+                    { incubation | injections = new_injections }
+
+                _ =
+                    Debug.log "old " incubation
+
+                _ =
+                    Debug.log "new " new_incubation
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchN2O point ->
-            let
-                new_incubation =
-                    update_incubation_n2o model.incubation point
-            in
-                ( { model | incubation = new_incubation }, Cmd.none )
-
-        SwitchPoint CO2 point ->
+        SwitchStandard CO2 point ->
             let
                 newPoint =
                     { point | deleted = not point.deleted }
@@ -929,7 +928,7 @@ update msg model =
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
-        SwitchPoint CH4 point ->
+        SwitchStandard CH4 point ->
             let
                 newPoint =
                     { point | deleted = not point.deleted }
@@ -945,7 +944,7 @@ update msg model =
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
-        SwitchPoint N2O point ->
+        SwitchStandard N2O point ->
             let
                 newPoint =
                     { point | deleted = not point.deleted }
