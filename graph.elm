@@ -163,7 +163,7 @@ co2_injections injections =
         pointInterval =
             interval (initialTime injections)
     in
-        List.map (\x -> Point x.co2_ppm (pointInterval x.datetime) x.co2_deleted x.id) injections
+        List.map (\x -> Point (pointInterval x.datetime) x.co2_ppm x.co2_deleted x.id) injections
 
 
 n2o_injections : List Injection -> List Point
@@ -172,7 +172,7 @@ n2o_injections injections =
         pointInterval =
             interval (initialTime injections)
     in
-        List.map (\x -> Point x.n2o_ppm (pointInterval x.datetime) x.n2o_deleted x.id) injections
+        List.map (\x -> Point (pointInterval x.datetime) x.n2o_ppm x.n2o_deleted x.id) injections
 
 
 ch4_injections : List Injection -> List Point
@@ -181,7 +181,7 @@ ch4_injections injections =
         pointInterval =
             interval (initialTime injections)
     in
-        List.map (\x -> Point x.ch4_ppm (pointInterval x.datetime) x.ch4_deleted x.id) injections
+        List.map (\x -> Point (pointInterval x.datetime) x.ch4_ppm x.ch4_deleted x.id) injections
 
 
 
@@ -290,7 +290,7 @@ updateCH4Standards standards ch4 =
 updateCO2Injection : Injection -> Point -> Injection
 updateCO2Injection injection co2 =
     if co2.id == injection.id then
-        { injection | co2_ppm = co2.x, co2_deleted = co2.deleted }
+        { injection | co2_ppm = co2.y, co2_deleted = co2.deleted }
     else
         let
             -- TODO: Log this to the server side
@@ -306,7 +306,7 @@ updateCO2Injection injection co2 =
 updateN2OInjection : Injection -> Point -> Injection
 updateN2OInjection injection n2o =
     if n2o.id == injection.id then
-        { injection | n2o_ppm = n2o.x, n2o_deleted = n2o.deleted }
+        { injection | n2o_ppm = n2o.y, n2o_deleted = n2o.deleted }
     else
         let
             -- TODO: Log this to the server side
@@ -322,7 +322,7 @@ updateN2OInjection injection n2o =
 updateCH4Injection : Injection -> Point -> Injection
 updateCH4Injection injection ch4 =
     if ch4.id == injection.id then
-        { injection | ch4_ppm = ch4.x, ch4_deleted = ch4.deleted }
+        { injection | ch4_ppm = ch4.y, ch4_deleted = ch4.deleted }
     else
         let
             -- TODO: Log this to the server side
@@ -611,14 +611,35 @@ swapIncubation model =
 -- VIEW
 
 
+x_offset : Float
+x_offset =
+    20.0
+
+
+y_offset : Float
+y_offset =
+    0.0
+
+
 translateCoords : String
 translateCoords =
-    "translate(20,0)"
+    String.concat
+        [ "translate("
+        , toString x_offset
+        , " "
+        , toString y_offset
+        , ")"
+        ]
 
 
 viewBox_ : Axis -> Axis -> String
 viewBox_ x_axis y_axis =
-    String.concat [ "0 0 ", (toString (x_axis.max_extent + 20)), " ", (toString y_axis.max_extent) ]
+    String.concat
+        [ "0 0 "
+        , (toString (x_axis.max_extent + x_offset))
+        , " "
+        , (toString (y_axis.max_extent + y_offset))
+        ]
 
 
 drawXAxis : Axis -> Axis -> Svg Msg
