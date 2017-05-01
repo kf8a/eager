@@ -11,12 +11,12 @@ import LeastSquares exposing (..)
 
 standard1 : Standard
 standard1 =
-    Standard 1 2 3 4 5 6 1
+    Standard 1 2 3 4 5 6 False False False 1
 
 
 standard2 : Standard
 standard2 =
-    Standard 1 2 3 4 5 6 2
+    Standard 1 2 3 4 5 6 False False False 2
 
 
 all : Test
@@ -50,7 +50,7 @@ all =
                             Point 8 9 True 1
                     in
                         updateN2OStandard standard1 n2oPoint
-                            |> Expect.equal (Standard 8 9 3 4 5 6 1)
+                            |> Expect.equal (Standard 8 9 3 4 5 6 False False False 1)
             , test "update standard list from point" <|
                 \() ->
                     let
@@ -64,7 +64,7 @@ all =
                             updateN2OStandards standards n2oPoint
                     in
                         updated
-                            |> Expect.equal [ standard2, (Standard 8 9 3 4 5 6 1) ]
+                            |> Expect.equal [ standard2, (Standard 8 9 3 4 5 6 False False False 1) ]
             ]
         , describe "transform from injection to point"
             []
@@ -133,7 +133,7 @@ all =
                 \() ->
                     let
                         standards =
-                            [ Standard 0.4 100 500 1000 2 50 0 ]
+                            [ Standard 0.4 100 500 1000 2 50 False False False 0 ]
                     in
                         standards
                             |> co2_standards
@@ -142,7 +142,7 @@ all =
                 \() ->
                     let
                         standards =
-                            [ Standard 0.4 100 500 1000 2 50 0 ]
+                            [ Standard 0.4 100 500 1000 2 50 False False False 0 ]
                     in
                         standards
                             |> n2o_standards
@@ -151,7 +151,7 @@ all =
                 \() ->
                     let
                         standards =
-                            [ Standard 0.4 100 500 1000 2 50 0 ]
+                            [ Standard 0.4 100 500 1000 2 50 False False False 0 ]
                     in
                         standards
                             |> ch4_standards

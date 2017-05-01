@@ -44,6 +44,9 @@ type alias Standard =
     , co2_mv : Float
     , ch4_ppm : Float
     , ch4_mv : Float
+    , n2o_deleted : Bool
+    , co2_deleted : Bool
+    , ch4_deleted : Bool
     , id : Int
     }
 
@@ -119,6 +122,9 @@ initialStandard =
     , co2_mv = 1000
     , ch4_ppm = 2.0
     , ch4_mv = 50.0
+    , n2o_deleted = False
+    , co2_deleted = False
+    , ch4_deleted = False
     , id = 0
     }
 
@@ -135,6 +141,21 @@ sortedRecords a b =
 
 
 -- Transformations
+
+
+co2_standards : List Standard -> List Point
+co2_standards standards =
+    List.map (\x -> Point x.co2_ppm x.co2_mv x.co2_deleted x.id) standards
+
+
+n2o_standards : List Standard -> List Point
+n2o_standards standards =
+    List.map (\x -> Point x.n2o_ppm x.n2o_mv x.n2o_deleted x.id) standards
+
+
+ch4_standards : List Standard -> List Point
+ch4_standards standards =
+    List.map (\x -> Point x.ch4_ppm x.ch4_mv x.ch4_deleted x.id) standards
 
 
 standardToCO2Point : Standard -> Point
@@ -377,6 +398,9 @@ standardDecoder =
         |> required "co2_mv" float
         |> required "ch4_ppm" float
         |> required "ch4_mv" float
+        |> hardcoded False
+        |> hardcoded False
+        |> hardcoded False
         |> required "id" int
 
 
@@ -446,29 +470,6 @@ update_point point incubation =
             { point | deleted = not point.deleted }
     in
         old_list ++ [ new_point ]
-
-
-update_standards : Gas -> List Standard -> Point -> List Standard
-update_standards gas standards point =
-    let
-        ( rest_of_standards, selected_standard ) =
-            List.partition (\x -> x.id /= point.id) standards
-
-        _ =
-            Debug.log "selected" selected_standard
-
-        newPoint =
-            case gas of
-                CO2 ->
-                    Debug.log "co2" point
-
-                CH4 ->
-                    point
-
-                N2O ->
-                    point
-    in
-        standards
 
 
 update_incubation_co2 : Incubation -> Point -> Incubation
@@ -622,21 +623,6 @@ drawRegressionLine xAxis yAxis flux =
             , fill "black"
             ]
             []
-
-
-co2_standards : List Standard -> List Point
-co2_standards standards =
-    List.map (\x -> Point x.co2_ppm x.co2_mv False x.id) standards
-
-
-n2o_standards : List Standard -> List Point
-n2o_standards standards =
-    List.map (\x -> Point x.n2o_ppm x.n2o_mv False x.id) standards
-
-
-ch4_standards : List Standard -> List Point
-ch4_standards standards =
-    List.map (\x -> Point x.ch4_ppm x.ch4_mv False x.id) standards
 
 
 draw_standards : Gas -> List Point -> Svg Msg
@@ -849,9 +835,6 @@ update msg model =
 
                 incubation =
                     model.incubation
-
-                newStandards =
-                    update_standards CO2 incubation.standards point
             in
                 ( model, Cmd.none )
 
