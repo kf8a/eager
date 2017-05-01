@@ -676,16 +676,11 @@ draw_standards gas points =
         yAxis =
             toYAxis flux
 
-        _ =
-            Debug.log "points" points
-
         fit =
-            Debug.log "fit"
-                (fitLineByLeastSquares points)
+            fitLineByLeastSquares points
 
         flux =
-            Debug.log "flux"
-                (fluxWithDefault fit points)
+            fluxWithDefault fit points
 
         my_dots =
             dots2 gas flux
@@ -866,40 +861,60 @@ update msg model =
 
         SwitchPoint CO2 point ->
             let
-                _ =
-                    Debug.log "CO2 point" point
-
-                incubation =
-                    model.incubation
-            in
-                ( model, Cmd.none )
-
-        SwitchPoint CH4 point ->
-            let
-                _ =
-                    Debug.log "CH4 point" point
-
-                incubation =
-                    model.incubation
-
-                standards =
-                    Debug.log "standards"
-                        incubation.standards
-            in
-                ( model, Cmd.none )
-
-        SwitchPoint N2O point ->
-            let
-                _ =
-                    Debug.log "N2O point" point
+                newPoint =
+                    { point | deleted = not point.deleted }
 
                 incubation =
                     model.incubation
 
                 standards =
                     incubation.standards
+
+                newStandards =
+                    updateCO2Standards standards newPoint
+
+                newIncubation =
+                    { incubation | standards = newStandards }
             in
-                ( model, Cmd.none )
+                ( { model | incubation = newIncubation }, Cmd.none )
+
+        SwitchPoint CH4 point ->
+            let
+                newPoint =
+                    { point | deleted = not point.deleted }
+
+                incubation =
+                    model.incubation
+
+                standards =
+                    incubation.standards
+
+                newStandards =
+                    updateCH4Standards standards newPoint
+
+                newIncubation =
+                    { incubation | standards = newStandards }
+            in
+                ( { model | incubation = newIncubation }, Cmd.none )
+
+        SwitchPoint N2O point ->
+            let
+                newPoint =
+                    { point | deleted = not point.deleted }
+
+                incubation =
+                    model.incubation
+
+                standards =
+                    incubation.standards
+
+                newStandards =
+                    updateN2OStandards standards newPoint
+
+                newIncubation =
+                    { incubation | standards = newStandards }
+            in
+                ( { model | incubation = newIncubation }, Cmd.none )
 
         FluxGood incubation ->
             let
