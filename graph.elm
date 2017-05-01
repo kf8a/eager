@@ -18,8 +18,7 @@ import SampleIncubation exposing (json, nextJson)
 
 
 type alias Flux =
-    { points : List Point
-    , slope : Float
+    { slope : Float
     , intercept : Float
     , r2 : Float
     }
@@ -71,7 +70,9 @@ type alias Injection =
     , n2o_ppm : Float
     , ch4_ppm : Float
     , id : Int
-    , deleted : Bool
+    , co2_deleted : Bool
+    , n2o_deleted : Bool
+    , ch4_deleted : Bool
     , datetime : Date
     }
 
@@ -288,6 +289,142 @@ updateCH4Standards standards ch4 =
         rest ++ newStandard
 
 
+updateCO2Injection : Injection -> Point -> Injection
+updateCO2Injection injection co2 =
+    if co2.id == injection.id then
+        { injection | co2_ppm = co2.x, co2_deleted = co2.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString co2, " did not match any id in " ]
+
+            _ =
+                Debug.log msg injection
+        in
+            injection
+
+
+updateN2OInjection : Injection -> Point -> Injection
+updateN2OInjection injection n2o =
+    if n2o.id == injection.id then
+        { injection | n2o_ppm = n2o.x, n2o_deleted = n2o.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString n2o, " did not match any id in " ]
+
+            _ =
+                Debug.log msg injection
+        in
+            injection
+
+
+update_co2_injection : List Injection -> Point -> List Injection
+update_co2_injection injections co2 =
+    let
+        ( injection, rest ) =
+            List.partition (\x -> x.id == co2.id) injections
+
+        newInjection =
+            case (List.head injection) of
+                Just myInjection ->
+                    [ updateCO2Injection myInjection co2 ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newInjection
+
+
+update_incubation_co2 : Incubation -> Point -> Incubation
+update_incubation_co2 incubation point =
+    let
+        co2 =
+            incubation.co2
+
+        newPoints =
+            update_point point (co2_injections incubation.injections)
+
+        fit =
+            fitLineByLeastSquares newPoints
+
+        newCO2 =
+            case fit of
+                Ok fitted ->
+                    { co2
+                        | slope = fitted.slope
+                        , intercept = fitted.intercept
+                    }
+
+                Err msg ->
+                    let
+                        _ =
+                            Debug.log "ERROR: " msg
+                    in
+                        co2
+    in
+        { incubation | co2 = newCO2 }
+
+
+update_incubation_ch4 : Incubation -> Point -> Incubation
+update_incubation_ch4 incubation point =
+    let
+        ch4 =
+            incubation.ch4
+
+        newPoints =
+            update_point point (ch4_injections incubation.injections)
+
+        fit =
+            fitLineByLeastSquares newPoints
+
+        newCH4 =
+            case fit of
+                Ok fitted ->
+                    { ch4 | slope = fitted.slope, intercept = fitted.intercept }
+
+                Err msg ->
+                    let
+                        _ =
+                            Debug.log "ERROR: " msg
+                    in
+                        ch4
+    in
+        { incubation | ch4 = newCH4 }
+
+
+update_incubation_n2o : Incubation -> Point -> Incubation
+update_incubation_n2o incubation point =
+    let
+        n2o =
+            incubation.n2o
+
+        newPoints =
+            update_point point (n2o_injections incubation.injections)
+
+        fit =
+            fitLineByLeastSquares newPoints
+
+        newN2O =
+            case fit of
+                Ok fitted ->
+                    { n2o
+                        | slope = fitted.slope
+                        , intercept = fitted.intercept
+                    }
+
+                Err msg ->
+                    let
+                        _ =
+                            Debug.log "ERROR: " msg
+                    in
+                        n2o
+    in
+        { incubation | n2o = newN2O }
+
+
 
 -- Translators
 
@@ -314,73 +451,36 @@ interval startTime time =
     ((Date.toTime time) - Date.toTime (startTime)) / 1000 / 60
 
 
-updateInjection : List Injection -> Int -> Bool -> List Injection
-updateInjection injections id active =
-    let
-        ( incubation, rest ) =
-            List.partition (\x -> x.id == id) injections
-
-        newIncubation =
-            case List.head incubation of
-                Just incubation ->
-                    [ { incubation | deleted = active } ]
-
-                Nothing ->
-                    []
-    in
-        List.concat [ rest, newIncubation ]
-
-
-fluxWithDefault : Result String Fit -> List Point -> Flux
-fluxWithDefault fit points =
+fluxWithDefault : Result String Fit -> Flux
+fluxWithDefault fit =
     case fit of
         Ok fit ->
-            Flux points fit.slope fit.intercept fit.r2
+            Flux fit.slope fit.intercept fit.r2
 
         Err message ->
-            Flux points 0 0 0
+            Flux 0 0 0
 
 
 toIncubation : List Injection -> List Standard -> Incubation
 toIncubation injections standards =
     let
-        startTime =
-            initialTime injections
-
-        pointInterval =
-            interval startTime
-
         fit =
             fitLineByLeastSquares (co2_injections injections)
 
         co2s =
-            fluxWithDefault fit (co2_injections injections)
-
-        ch4Points =
-            List.map
-                (\x ->
-                    Point (pointInterval x.datetime) x.ch4_ppm x.deleted x.id
-                )
-                injections
+            fluxWithDefault fit
 
         fitch4 =
-            fitLineByLeastSquares ch4Points
+            fitLineByLeastSquares (ch4_injections injections)
 
         ch4s =
-            fluxWithDefault fitch4 ch4Points
-
-        n2oPoints =
-            List.map
-                (\x ->
-                    Point (pointInterval x.datetime) x.n2o_ppm x.deleted x.id
-                )
-                injections
+            fluxWithDefault fitch4
 
         fitn2o =
-            fitLineByLeastSquares n2oPoints
+            fitLineByLeastSquares (n2o_injections injections)
 
         n2os =
-            fluxWithDefault fitn2o n2oPoints
+            fluxWithDefault fitn2o
     in
         Incubation
             co2s
@@ -419,6 +519,8 @@ incubationDecoder =
         |> required "n2o_ppm" float
         |> required "ch4_ppm" float
         |> required "id" int
+        |> hardcoded False
+        |> hardcoded False
         |> hardcoded False
         |> required "sampled_at" date
 
@@ -532,87 +634,6 @@ update_point point incubation =
         old_list ++ [ new_point ]
 
 
-update_incubation_co2 : Incubation -> Point -> Incubation
-update_incubation_co2 incubation point =
-    let
-        co2 =
-            incubation.co2
-
-        newPoints =
-            update_point point co2.points
-
-        fit =
-            fitLineByLeastSquares newPoints
-
-        newCO2 =
-            case fit of
-                Ok fitted ->
-                    { co2
-                        | points = newPoints
-                        , slope = fitted.slope
-                        , intercept = fitted.intercept
-                    }
-
-                _ ->
-                    { co2 | points = newPoints }
-    in
-        { incubation | co2 = newCO2 }
-
-
-update_incubation_ch4 : Incubation -> Point -> Incubation
-update_incubation_ch4 incubation point =
-    let
-        ch4 =
-            incubation.ch4
-
-        newPoints =
-            update_point point ch4.points
-
-        fit =
-            fitLineByLeastSquares newPoints
-
-        newCH4 =
-            case fit of
-                Ok fitted ->
-                    { ch4
-                        | points = newPoints
-                        , slope = fitted.slope
-                        , intercept = fitted.intercept
-                    }
-
-                _ ->
-                    { ch4 | points = newPoints }
-    in
-        { incubation | ch4 = newCH4 }
-
-
-update_incubation_n2o : Incubation -> Point -> Incubation
-update_incubation_n2o incubation point =
-    let
-        n2o =
-            incubation.n2o
-
-        newPoints =
-            update_point point n2o.points
-
-        fit =
-            fitLineByLeastSquares newPoints
-
-        newN2O =
-            case fit of
-                Ok fitted ->
-                    { n2o
-                        | points = newPoints
-                        , slope = fitted.slope
-                        , intercept = fitted.intercept
-                    }
-
-                _ ->
-                    { n2o | points = newPoints }
-    in
-        { incubation | n2o = newN2O }
-
-
 swapIncubation : Model -> Model
 swapIncubation model =
     let
@@ -695,31 +716,31 @@ draw_standards gas points =
             maxY points
 
         xAxis =
-            toXAxis flux
+            toXAxis points
 
         yAxis =
-            toYAxis flux
+            toYAxis points
 
         fit =
             fitLineByLeastSquares points
 
         flux =
-            fluxWithDefault fit points
+            fluxWithDefault fit
 
         my_dots =
-            dots2 gas flux
+            dots2 gas points
     in
-        draw_graph my_dots flux
+        draw_graph my_dots points flux
 
 
-draw_graph : List (Svg Msg) -> Flux -> Svg Msg
-draw_graph drawing_func flux =
+draw_graph : List (Svg Msg) -> List Point -> Flux -> Svg Msg
+draw_graph drawing_func points flux =
     let
         xAxis =
-            toXAxis flux
+            toXAxis points
 
         yAxis =
-            toYAxis flux
+            toYAxis points
     in
         svg
             [ width (toString (xAxis.max_extent + 10))
@@ -761,45 +782,45 @@ dot x_axis yAxis msg point =
             []
 
 
-toXAxis : Flux -> Axis
-toXAxis flux =
-    Axis 0 200 0 (maxX flux.points)
+toXAxis : List Point -> Axis
+toXAxis points =
+    Axis 0 200 0 (maxX points)
 
 
-toYAxis : Flux -> Axis
-toYAxis flux =
-    Axis 0 200 0 (maxY flux.points)
+toYAxis : List Point -> Axis
+toYAxis points =
+    Axis 0 200 0 (maxY points)
 
 
-dots2 : Gas -> Flux -> List (Svg Msg)
-dots2 gas flux =
+dots2 : Gas -> List Point -> List (Svg Msg)
+dots2 gas points =
     let
         dotTransform =
-            dot (toXAxis flux) (toYAxis flux)
+            dot (toXAxis points) (toYAxis points)
     in
-        List.map (\x -> dotTransform (SwitchPoint gas x) x) flux.points
+        List.map (\x -> dotTransform (SwitchPoint gas x) x) points
 
 
-dots : (Point -> Msg) -> Flux -> List (Svg Msg)
-dots msg flux =
+dots : (Point -> Msg) -> List Point -> List (Svg Msg)
+dots msg points =
     let
         dotTransform =
-            dot (toXAxis flux) (toYAxis flux)
+            dot (toXAxis points) (toYAxis points)
     in
-        List.map (\x -> dotTransform (msg x) x) flux.points
+        List.map (\x -> dotTransform (msg x) x) points
 
 
 view : Model -> Html Msg
 view model =
     let
         n2o =
-            model.incubation.n2o
+            n2o_injections model.incubation.injections
 
         co2 =
-            model.incubation.co2
+            co2_injections model.incubation.injections
 
         ch4 =
-            model.incubation.ch4
+            ch4_injections model.incubation.injections
 
         dots_n2o =
             dots SwitchN2O n2o
@@ -817,9 +838,9 @@ view model =
                 , draw_standards CH4 (ch4_standards model.incubation.standards)
                 ]
             , div []
-                [ draw_graph dots_co2 co2
-                , draw_graph dots_ch4 ch4
-                , draw_graph dots_n2o n2o
+                [ draw_graph dots_co2 co2 model.incubation.co2
+                , draw_graph dots_ch4 ch4 model.incubation.ch4
+                , draw_graph dots_n2o n2o model.incubation.n2o
                 ]
             , button
                 [ onClick (FluxGood model.incubation) ]
@@ -864,8 +885,17 @@ update msg model =
     case msg of
         SwitchCO2 point ->
             let
+                new_point =
+                    { point | deleted = not point.deleted }
+
+                incubation =
+                    model.incubation
+
+                new_injections =
+                    update_co2_injection incubation.injections new_point
+
                 new_incubation =
-                    update_incubation_co2 model.incubation point
+                    { incubation | injections = new_injections }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
@@ -891,11 +921,8 @@ update msg model =
                 incubation =
                     model.incubation
 
-                standards =
-                    incubation.standards
-
                 newStandards =
-                    updateCO2Standards standards newPoint
+                    updateCO2Standards incubation.standards newPoint
 
                 newIncubation =
                     { incubation | standards = newStandards }
@@ -910,11 +937,8 @@ update msg model =
                 incubation =
                     model.incubation
 
-                standards =
-                    incubation.standards
-
                 newStandards =
-                    updateCH4Standards standards newPoint
+                    updateCH4Standards incubation.standards newPoint
 
                 newIncubation =
                     { incubation | standards = newStandards }
@@ -929,11 +953,8 @@ update msg model =
                 incubation =
                     model.incubation
 
-                standards =
-                    incubation.standards
-
                 newStandards =
-                    updateN2OStandards standards newPoint
+                    updateN2OStandards incubation.standards newPoint
 
                 newIncubation =
                     { incubation | standards = newStandards }
