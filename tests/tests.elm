@@ -22,25 +22,19 @@ standard2 =
 all : Test
 all =
     describe "the graph module"
-        [ describe "transform from standards to point"
-            [ test "it extracts a CO2 point" <|
-                \() ->
-                    standardToCO2Point standard1
-                        |> Expect.equal (Point 3 4 True 1)
-            , test "it extracts a N2O point" <|
-                \() ->
-                    standardToN2OPoint standard1
-                        |> Expect.equal (Point 1 2 True 1)
-            , test "it extracts a CH4 point" <|
-                \() ->
-                    standardToCH4Point standard1
-                        |> Expect.equal (Point 5 6 True 1)
-            ]
-        , describe "transform from standards to point list"
+        [ describe "transform from standards to point list"
             [ test "extract co2 point list" <|
                 \() ->
-                    standardsToCO2Points [ standard1, standard2 ]
-                        |> Expect.equal [ (Point 3 4 True 1), (Point 3 4 True 2) ]
+                    co2_standards [ standard1, standard2 ]
+                        |> Expect.equal [ (Point 3 4 False 1), (Point 3 4 False 2) ]
+            , test "extract n2o point list" <|
+                \() ->
+                    n2o_standards [ standard1, standard2 ]
+                        |> Expect.equal [ (Point 1 2 False 1), (Point 1 2 False 2) ]
+            , test "extract ch4 point list" <|
+                \() ->
+                    ch4_standards [ standard1, standard2 ]
+                        |> Expect.equal [ (Point 5 6 False 1), (Point 5 6 False 2) ]
             ]
         , describe "transform from incubation to standard"
             [ test "update standard from point with matching id" <|
@@ -50,7 +44,7 @@ all =
                             Point 8 9 True 1
                     in
                         updateN2OStandard standard1 n2oPoint
-                            |> Expect.equal (Standard 8 9 3 4 5 6 False False False 1)
+                            |> Expect.equal (Standard 8 9 3 4 5 6 True False False 1)
             , test "update standard list from point" <|
                 \() ->
                     let
@@ -64,7 +58,7 @@ all =
                             updateN2OStandards standards n2oPoint
                     in
                         updated
-                            |> Expect.equal [ standard2, (Standard 8 9 3 4 5 6 False False False 1) ]
+                            |> Expect.equal [ standard2, (Standard 8 9 3 4 5 6 True False False 1) ]
             ]
         , describe "transform from injection to point"
             []

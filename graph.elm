@@ -158,45 +158,47 @@ ch4_standards standards =
     List.map (\x -> Point x.ch4_ppm x.ch4_mv x.ch4_deleted x.id) standards
 
 
-standardToCO2Point : Standard -> Point
-standardToCO2Point standard =
-    Point standard.co2_ppm standard.co2_mv True standard.id
-
-
-standardsToCO2Points : List Standard -> List Point
-standardsToCO2Points standards =
-    List.map standardToCO2Point standards
-
-
-standardToN2OPoint : Standard -> Point
-standardToN2OPoint standard =
-    Point standard.n2o_ppm standard.n2o_mv True standard.id
-
-
-standardsToN2OPoints : List Standard -> List Point
-standardsToN2OPoints standards =
-    List.map standardToN2OPoint standards
-
-
-standardToCH4Point : Standard -> Point
-standardToCH4Point standard =
-    Point standard.ch4_ppm standard.ch4_mv True standard.id
-
-
-standardsToCH4Points : List Standard -> List Point
-standardsToCH4Points standards =
-    List.map standardToCH4Point standards
-
-
 updateN2OStandard : Standard -> Point -> Standard
 updateN2OStandard standard n2o =
     if n2o.id == standard.id then
-        { standard | n2o_ppm = n2o.x, n2o_mv = n2o.y }
+        { standard | n2o_ppm = n2o.x, n2o_mv = n2o.y, n2o_deleted = n2o.deleted }
     else
         let
             -- TODO: Log this to the server side
             msg =
                 String.concat [ "ERROR: ", toString n2o, " did not match any id in " ]
+
+            _ =
+                Debug.log msg standard
+        in
+            standard
+
+
+updateCO2Standard : Standard -> Point -> Standard
+updateCO2Standard standard co2 =
+    if co2.id == standard.id then
+        { standard | co2_ppm = co2.x, co2_mv = co2.y, co2_deleted = co2.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString co2, " did not match any id in " ]
+
+            _ =
+                Debug.log msg standard
+        in
+            standard
+
+
+updateCH4Standard : Standard -> Point -> Standard
+updateCH4Standard standard ch4 =
+    if ch4.id == standard.id then
+        { standard | ch4_ppm = ch4.x, ch4_mv = ch4.y, ch4_deleted = ch4.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString ch4, " did not match any id in " ]
 
             _ =
                 Debug.log msg standard
@@ -214,6 +216,40 @@ updateN2OStandards standards n2o =
             case (List.head standard) of
                 Just myStandard ->
                     [ updateN2OStandard myStandard n2o ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newStandard
+
+
+updateCO2Standards : List Standard -> Point -> List Standard
+updateCO2Standards standards co2 =
+    let
+        ( standard, rest ) =
+            List.partition (\x -> x.id == co2.id) standards
+
+        newStandard =
+            case (List.head standard) of
+                Just myStandard ->
+                    [ updateCO2Standard myStandard co2 ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newStandard
+
+
+updateCH4Standards : List Standard -> Point -> List Standard
+updateCH4Standards standards ch4 =
+    let
+        ( standard, rest ) =
+            List.partition (\x -> x.id == ch4.id) standards
+
+        newStandard =
+            case (List.head standard) of
+                Just myStandard ->
+                    [ updateCH4Standard myStandard ch4 ]
 
                 Nothing ->
                     []
