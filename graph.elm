@@ -140,7 +140,7 @@ sortedRecords a b =
 
 
 
--- Transformations
+-- Point extractors
 
 
 co2_standards : List Standard -> List Point
@@ -156,6 +156,37 @@ n2o_standards standards =
 ch4_standards : List Standard -> List Point
 ch4_standards standards =
     List.map (\x -> Point x.ch4_ppm x.ch4_mv x.ch4_deleted x.id) standards
+
+
+co2_injections : List Injection -> List Point
+co2_injections injections =
+    let
+        pointInterval =
+            interval (initialTime injections)
+    in
+        List.map (\x -> Point x.co2_ppm (pointInterval x.datetime) False x.id) injections
+
+
+n2o_injections : List Injection -> List Point
+n2o_injections injections =
+    let
+        pointInterval =
+            interval (initialTime injections)
+    in
+        List.map (\x -> Point x.n2o_ppm (pointInterval x.datetime) False x.id) injections
+
+
+ch4_injections : List Injection -> List Point
+ch4_injections injections =
+    let
+        pointInterval =
+            interval (initialTime injections)
+    in
+        List.map (\x -> Point x.ch4_ppm (pointInterval x.datetime) False x.id) injections
+
+
+
+-- updaters
 
 
 updateN2OStandard : Standard -> Point -> Standard
@@ -319,18 +350,11 @@ toIncubation injections standards =
         pointInterval =
             interval startTime
 
-        co2Points =
-            List.map
-                (\x ->
-                    Point (pointInterval x.datetime) x.co2_ppm x.deleted x.id
-                )
-                injections
-
         fit =
-            fitLineByLeastSquares co2Points
+            fitLineByLeastSquares (co2_injections injections)
 
         co2s =
-            fluxWithDefault fit co2Points
+            fluxWithDefault fit (co2_injections injections)
 
         ch4Points =
             List.map

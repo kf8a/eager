@@ -7,6 +7,8 @@ import Json.Decode exposing (decodeString, Value)
 import String
 import Graph exposing (..)
 import LeastSquares exposing (..)
+import Date exposing (Month(..))
+import Date.Extra as DE exposing (..)
 
 
 standard1 : Standard
@@ -17,6 +19,24 @@ standard1 =
 standard2 : Standard
 standard2 =
     Standard 1 2 3 4 5 6 False False False 2
+
+
+injection1 : Injection
+injection1 =
+    let
+        date =
+            DE.fromParts 2017 May 1 12 50 0 0
+    in
+        Injection 500 0.3 2 1 False date
+
+
+injection2 : Injection
+injection2 =
+    let
+        date =
+            DE.fromParts 2017 May 1 12 55 0 0
+    in
+        Injection 600 0.6 1 2 False date
 
 
 all : Test
@@ -60,8 +80,24 @@ all =
                         updated
                             |> Expect.equal [ standard2, (Standard 8 9 3 4 5 6 True False False 1) ]
             ]
-        , describe "transform from injection to point"
-            []
+        , describe "transform from injection to point list"
+            [ test "extract c2o point list" <|
+                \() ->
+                    co2_injections [ injection1, injection2 ]
+                        |> Expect.equal [ (Point 500 0 False 1), (Point 600 5 False 2) ]
+            , test "extract n2o point list" <|
+                \() ->
+                    n2o_injections [ injection1, injection2 ]
+                        |> Expect.equal [ (Point 0.3 0 False 1), (Point 0.6 5 False 2) ]
+            , test "extract ch4 point list" <|
+                \() ->
+                    ch4_injections [ injection1, injection2 ]
+                        |> Expect.equal [ (Point 2 0 False 1), (Point 1 5 False 2) ]
+            , test "extract c2o point list reversed " <|
+                \() ->
+                    co2_injections [ injection2, injection1 ]
+                        |> Expect.equal [ (Point 600 5 False 2), (Point 500 0 False 1) ]
+            ]
         , describe "transfrom from point to injection"
             []
         , describe "least squares fit"
@@ -121,35 +157,6 @@ all =
                     in
                         axisTransform axis value
                             |> Expect.equal 0
-            ]
-        , describe "the standard filters to points"
-            [ test "it grabs the right co2 parameters" <|
-                \() ->
-                    let
-                        standards =
-                            [ Standard 0.4 100 500 1000 2 50 False False False 0 ]
-                    in
-                        standards
-                            |> co2_standards
-                            |> Expect.equal [ Point 500 1000 False 0 ]
-            , test "it grabs the right n2o parameters" <|
-                \() ->
-                    let
-                        standards =
-                            [ Standard 0.4 100 500 1000 2 50 False False False 0 ]
-                    in
-                        standards
-                            |> n2o_standards
-                            |> Expect.equal [ Point 0.4 100 False 0 ]
-            , test "it grabs the right ch4 parameters" <|
-                \() ->
-                    let
-                        standards =
-                            [ Standard 0.4 100 500 1000 2 50 False False False 0 ]
-                    in
-                        standards
-                            |> ch4_standards
-                            |> Expect.equal [ Point 2 50 False 0 ]
             ]
         , describe "standards decoder"
             [ test "it parses correct json" <|
