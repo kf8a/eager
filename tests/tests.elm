@@ -9,10 +9,64 @@ import Graph exposing (..)
 import LeastSquares exposing (..)
 
 
+standard1 : Standard
+standard1 =
+    Standard 1 2 3 4 5 6 1
+
+
+standard2 : Standard
+standard2 =
+    Standard 1 2 3 4 5 6 2
+
+
 all : Test
 all =
     describe "the graph module"
-        [ describe "least squares fit"
+        [ describe "transform from standards to point"
+            [ test "it extracts a CO2 point" <|
+                \() ->
+                    standardToCO2Point standard1
+                        |> Expect.equal (Point 3 4 True 1)
+            , test "it extracts a N2O point" <|
+                \() ->
+                    standardToN2OPoint standard1
+                        |> Expect.equal (Point 1 2 True 1)
+            , test "it extracts a CH4 point" <|
+                \() ->
+                    standardToCH4Point standard1
+                        |> Expect.equal (Point 5 6 True 1)
+            ]
+        , describe "transform from standards to point list"
+            []
+        , describe "transform from incubation to standard"
+            [ test "update standard from point with matching id" <|
+                \() ->
+                    let
+                        n2oPoint =
+                            Point 8 9 True 1
+                    in
+                        updateN2OStandard standard1 n2oPoint
+                            |> Expect.equal (Standard 8 9 3 4 5 6 1)
+            , test "update standard list from point" <|
+                \() ->
+                    let
+                        n2oPoint =
+                            Point 8 9 True 1
+
+                        standards =
+                            [ standard1, standard2 ]
+
+                        updated =
+                            updateN2OStandards standards n2oPoint
+                    in
+                        updated
+                            |> Expect.equal [ standard2, (Standard 8 9 3 4 5 6 1) ]
+            ]
+        , describe "transform from injection to point"
+            []
+        , describe "transfrom from point to injection"
+            []
+        , describe "least squares fit"
             [ test "simple fit" <|
                 \() ->
                     let

@@ -134,6 +134,58 @@ sortedRecords a b =
 
 
 
+-- Transformations
+
+
+standardToCO2Point : Standard -> Point
+standardToCO2Point standard =
+    Point standard.co2_ppm standard.co2_mv True standard.id
+
+
+standardToN2OPoint : Standard -> Point
+standardToN2OPoint standard =
+    Point standard.n2o_ppm standard.n2o_mv True standard.id
+
+
+standardToCH4Point : Standard -> Point
+standardToCH4Point standard =
+    Point standard.ch4_ppm standard.ch4_mv True standard.id
+
+
+updateN2OStandard : Standard -> Point -> Standard
+updateN2OStandard standard n2o =
+    if n2o.id == standard.id then
+        { standard | n2o_ppm = n2o.x, n2o_mv = n2o.y }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString n2o, " did not match any id in " ]
+
+            _ =
+                Debug.log msg standard
+        in
+            standard
+
+
+updateN2OStandards : List Standard -> Point -> List Standard
+updateN2OStandards standards n2o =
+    let
+        ( standard, rest ) =
+            List.partition (\x -> x.id == n2o.id) standards
+
+        newStandard =
+            case (List.head standard) of
+                Just myStandard ->
+                    [ updateN2OStandard myStandard n2o ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newStandard
+
+
+
 -- Translators
 
 
