@@ -37,7 +37,11 @@ all =
                         |> Expect.equal (Point 5 6 True 1)
             ]
         , describe "transform from standards to point list"
-            []
+            [ test "extract co2 point list" <|
+                \() ->
+                    standardsToCO2Points [ standard1, standard2 ]
+                        |> Expect.equal [ (Point 3 4 True 1), (Point 3 4 True 2) ]
+            ]
         , describe "transform from incubation to standard"
             [ test "update standard from point with matching id" <|
                 \() ->

@@ -142,14 +142,29 @@ standardToCO2Point standard =
     Point standard.co2_ppm standard.co2_mv True standard.id
 
 
+standardsToCO2Points : List Standard -> List Point
+standardsToCO2Points standards =
+    List.map standardToCO2Point standards
+
+
 standardToN2OPoint : Standard -> Point
 standardToN2OPoint standard =
     Point standard.n2o_ppm standard.n2o_mv True standard.id
 
 
+standardsToN2OPoints : List Standard -> List Point
+standardsToN2OPoints standards =
+    List.map standardToN2OPoint standards
+
+
 standardToCH4Point : Standard -> Point
 standardToCH4Point standard =
     Point standard.ch4_ppm standard.ch4_mv True standard.id
+
+
+standardsToCH4Points : List Standard -> List Point
+standardsToCH4Points standards =
+    List.map standardToCH4Point standards
 
 
 updateN2OStandard : Standard -> Point -> Standard
