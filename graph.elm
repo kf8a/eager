@@ -593,16 +593,6 @@ maxX points =
 
 axisTransform : Axis -> Float -> Float
 axisTransform axis value =
-    if value > axis.max_value then
-        axis.max_extent
-    else if value < axis.min_value then
-        axis.min_extent
-    else
-        unboundedAxisTransform axis value
-
-
-unboundedAxisTransform : Axis -> Float -> Float
-unboundedAxisTransform axis value =
     (axis.max_extent / (axis.max_value - axis.min_value) * value)
 
 
@@ -646,12 +636,12 @@ swapIncubation model =
 
 x_offset : Float
 x_offset =
-    20.0
+    30.0
 
 
 y_offset : Float
 y_offset =
-    0.0
+    10.0
 
 
 translateCoords : String
@@ -705,10 +695,10 @@ drawRegressionLine : Axis -> Axis -> Flux -> Svg Msg
 drawRegressionLine xAxis yAxis flux =
     let
         xAxisTransform =
-            unboundedAxisTransform xAxis
+            axisTransform xAxis
 
         yAxisTransform =
-            unboundedAxisTransform yAxis
+            axisTransform yAxis
     in
         line
             [ x1 (toString (xAxisTransform xAxis.min_value))
@@ -804,26 +794,49 @@ draw_graph drawing_func label points flux =
 
 
 dot : Axis -> Axis -> Msg -> Point -> Svg Msg
-dot x_axis yAxis msg point =
+dot xAxis yAxis msg point =
     let
         color =
             pointColor point.deleted
 
-        x_axis_transform =
-            axisTransform x_axis
+        xAxis_transform =
+            axisTransform xAxis
 
         yAxis_transform =
             axisTransform yAxis
     in
-        circle
-            [ cx (toString (x_axis_transform point.x))
-            , cy (toString (yAxis.max_extent - yAxis_transform point.y))
-            , r "5"
-            , stroke color
-            , fill color
-            , onClick msg
-            ]
-            []
+        case point.deleted of
+            False ->
+                circle
+                    [ cx (toString (xAxis_transform point.x))
+                    , cy (toString (yAxis.max_extent - yAxis_transform point.y))
+                    , r "5"
+                    , stroke color
+                    , fill color
+                    , onClick msg
+                    ]
+                    []
+
+            True ->
+                g []
+                    [ circle
+                        [ cx (toString (xAxis_transform point.x))
+                        , cy (toString (yAxis.max_extent - yAxis_transform point.y))
+                        , r "5"
+                        , stroke color
+                        , fill "none"
+                        ]
+                        []
+                    , circle
+                        [ cx (toString (xAxis.max_extent))
+                        , cy (toString (yAxis.max_extent - yAxis_transform point.y))
+                        , r "5"
+                        , stroke color
+                        , fill color
+                        , onClick msg
+                        ]
+                        []
+                    ]
 
 
 toXAxis : List Point -> Axis
