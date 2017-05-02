@@ -8,6 +8,7 @@ import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Html
 import Html exposing (..)
 import Html exposing (program, Html)
+import Html.Attributes as HA exposing (style)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (..)
@@ -832,11 +833,8 @@ renderListElement point =
     let
         msg =
             String.concat
-                [ "id = "
-                , toString point.id
-                , " x = "
-                , toString point.x
-                , " y = "
+                [ toString point.x
+                , ", "
                 , toString point.y
                 ]
     in
@@ -845,7 +843,7 @@ renderListElement point =
 
 renderList : List Point -> Html Msg
 renderList points =
-    ul []
+    ul [ HA.style [ ( "float", "right" ) ] ]
         (List.map (\x -> renderListElement x) points)
 
 
