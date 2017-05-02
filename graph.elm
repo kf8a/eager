@@ -681,7 +681,7 @@ drawRegressionLine xAxis yAxis flux =
             [ x1 (toString (xAxisTransform xAxis.min_value))
             , x2 (toString (xAxisTransform xAxis.max_value))
             , y1 (toString (yAxis.max_extent - (yAxisTransform flux.intercept)))
-            , y2 (toString (yAxis.max_extent - (yAxisTransform flux.slope) * xAxis.max_value))
+            , y2 (toString (yAxis.max_extent - (yAxisTransform (flux.slope * xAxis.max_value))))
             , stroke "black"
             , fill "black"
             ]
@@ -691,12 +691,6 @@ drawRegressionLine xAxis yAxis flux =
 draw_standards : Gas -> List Point -> Svg Msg
 draw_standards gas points =
     let
-        max_x =
-            maxX points
-
-        max_y =
-            maxY points
-
         xAxis =
             toXAxis points
 
@@ -718,12 +712,6 @@ draw_standards gas points =
 draw_injections : Gas -> List Point -> Svg Msg
 draw_injections gas points =
     let
-        max_x =
-            maxX points
-
-        max_y =
-            maxY points
-
         xAxis =
             toXAxis points
 
