@@ -883,9 +883,9 @@ updateIncubation incubation updater point =
     in
         new_incubation
 
-
+--- todo  move flux updating here by passing in the extractor
 updateStandard : Incubation -> (List Standard -> Point -> List Standard) -> Point -> Incubation
-updateStandard incubation updater point =
+updateStandard incubation updater extractor point =
     let
         new_point =
             { point | deleted = not point.deleted }
