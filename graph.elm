@@ -691,12 +691,6 @@ drawRegressionLine xAxis yAxis flux =
 draw_standards : Gas -> List Point -> Svg Msg
 draw_standards gas points =
     let
-        xAxis =
-            toXAxis points
-
-        yAxis =
-            toYAxis points
-
         fit =
             fitLineByLeastSquares points
 
@@ -712,12 +706,6 @@ draw_standards gas points =
 draw_injections : Gas -> List Point -> Svg Msg
 draw_injections gas points =
     let
-        xAxis =
-            toXAxis points
-
-        yAxis =
-            toYAxis points
-
         fit =
             fitLineByLeastSquares points
 
