@@ -27,14 +27,14 @@ type alias Flux =
 
 
 type alias Incubation =
-    { co2_flux : Flux
-    , ch4_flux : Flux
-    , n2o_flux : Flux
+    { co2_flux : Maybe Flux
+    , ch4_flux : Maybe Flux
+    , n2o_flux : Maybe Flux
     , injections : List Injection
     , standards : List Standard
-    , co2_calibration : Flux
-    , ch4_calibration : Flux
-    , n2o_calibration : Flux
+    , co2_calibration : Maybe Flux
+    , ch4_calibration : Maybe Flux
+    , n2o_calibration : Maybe Flux
     }
 
 
@@ -157,6 +157,7 @@ n2o_standards standards =
 ch4_standards : List Standard -> List Point
 ch4_standards standards =
     List.map (\x -> Point x.ch4_ppm x.ch4_mv x.ch4_deleted x.id) standards
+        |> List.filter (\x -> x.y /= 0.0)
 
 
 co2_injections : List Injection -> List Point
@@ -446,14 +447,19 @@ toIncubation injections standards =
             toFit (n2o_injections injections)
     in
         Incubation
-            co2s
-            ch4s
-            n2os
+            (Just co2s)
+            (Just ch4s)
+            (Just n2os)
             injections
             initialStandards
-            co2s
-            co2s
-            co2s
+            Nothing
+            Nothing
+            Nothing
+
+
+nullFlux : Flux
+nullFlux =
+    Flux 0 0 0
 
 
 
@@ -475,23 +481,43 @@ date =
         JD.string |> JD.andThen convert
 
 
-incubationDecoder : Decoder Injection
-incubationDecoder =
+
+-- incubationDecoder : Decoder Incubation
+-- incubationDecoder =
+--     decode Incubation
+--         |> hardcoded "co2_flux" nullFlux
+--         |> hardcoded "ch4_flux" nullFlux
+--         |> hardcoded "n2o_flux" nullFlux
+--         |> required "injections" (list injectionDecoder)
+--         |> optional "standards" (list standardDecoder) []
+--         |> hardcoded "co2_calibration" nullFlux
+--         |> hardcoded "ch4_calibration" nullFlux
+--         |> hardcoded "n2o_calibration" nullFlux
+--
+--
+-- responseIncubationDecoder : Decoder (List Incubation)
+-- responseIncubationDecoder =
+--     decode identity
+--         |> required "data" (list incubationDecoder)
+
+
+injectionDecoder : Decoder Injection
+injectionDecoder =
     decode Injection
         |> required "co2_ppm" float
         |> required "n2o_ppm" float
         |> required "ch4_ppm" float
         |> required "id" int
-        |> hardcoded False
-        |> hardcoded False
-        |> hardcoded False
+        |> optional "n2o_deleted" bool False
+        |> optional "co2_deleted" bool False
+        |> optional "ch4_deleted" bool False
         |> required "sampled_at" date
 
 
 responseDecoder : Decoder (List Injection)
 responseDecoder =
     decode identity
-        |> required "data" (list incubationDecoder)
+        |> required "data" (list injectionDecoder)
 
 
 decodeInjections : String -> List Injection
@@ -944,7 +970,7 @@ update msg model =
                     toFit (co2_injections updated_incubation.injections)
 
                 new_incubation =
-                    { updated_incubation | co2_flux = new_flux }
+                    { updated_incubation | co2_flux = Just new_flux }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
@@ -957,7 +983,7 @@ update msg model =
                     toFit (ch4_injections updated_incubation.injections)
 
                 new_incubation =
-                    { updated_incubation | ch4_flux = new_flux }
+                    { updated_incubation | ch4_flux = Just new_flux }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
@@ -970,7 +996,7 @@ update msg model =
                     toFit (n2o_injections updated_incubation.injections)
 
                 new_incubation =
-                    { updated_incubation | n2o_flux = new_flux }
+                    { updated_incubation | n2o_flux = Just new_flux }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
@@ -983,7 +1009,7 @@ update msg model =
                     toFit (co2_standards updatedIncubation.standards)
 
                 newIncubation =
-                    { updatedIncubation | co2_calibration = new_flux }
+                    { updatedIncubation | co2_calibration = Just new_flux }
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
@@ -996,7 +1022,7 @@ update msg model =
                     toFit (ch4_standards updatedIncubation.standards)
 
                 newIncubation =
-                    { updatedIncubation | ch4_calibration = new_flux }
+                    { updatedIncubation | ch4_calibration = Just new_flux }
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
@@ -1009,7 +1035,7 @@ update msg model =
                     toFit (n2o_standards updatedIncubation.standards)
 
                 newIncubation =
-                    { updatedIncubation | n2o_calibration = new_flux }
+                    { updatedIncubation | n2o_calibration = Just new_flux }
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 

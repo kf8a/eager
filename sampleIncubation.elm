@@ -4,118 +4,98 @@ module SampleIncubation exposing (..)
 json : String
 json =
     """
-  {
-    "data": [
-        {
-            "sampled_at": "2011-05-04T19:16:52.393222",
-            "n2o_ppm": 0.34854400157928467,
-            "incubation_id": 50203,
-            "id": 264623,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 134.1361083984375,
-            "ch4_ppm": 1.8629305362701416
-        },
-        {
-            "sampled_at": "2011-05-04T19:35:29.709224",
-            "n2o_ppm": 0.35114768147468567,
-            "incubation_id": 50203,
-            "id": 264636,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 73.04869842529297,
-            "ch4_ppm": 1.33671875
-        },
-        {
-            "sampled_at": "2011-05-04T20:11:15.849210",
-            "n2o_ppm": 0.3541080057621002,
-            "incubation_id": 50203,
-            "id": 264644,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 674.137939453125,
-            "ch4_ppm": 1.8641358613967896
-        },
-        {
-            "sampled_at": "2011-05-04T19:53:22.905214",
-            "n2o_ppm": 0.35141608119010925,
-            "incubation_id": 50203,
-            "id": 264640,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 746.5516967773438,
-            "ch4_ppm": 1.8520569801330566
-        },
-        {
-            "sampled_at": "2011-05-04T20:29:09.113220",
-            "n2o_ppm": 0.3564942479133606,
-            "incubation_id": 50203,
-            "id": 264648,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 500,
-            "ch4_ppm": 1.8188018798828125
-        }
-    ]
-}
+    {
+    "data": {
+        "sampled_at": "2016-05-20T09:30:00",
+        "injections": [{
+            "sampled_at": "2016-05-20T09:30:00",
+            "n2o_deleted": null,
+            "n2o": 932.134766,
+            "id": 61,
+            "co2_deleted": false,
+            "co2": 140414.765625,
+            "ch4_deleted": false,
+            "ch4": 24.330027
+        }, {
+            "sampled_at": "2016-05-20T09:30:00",
+            "n2o_deleted": null,
+            "n2o": 1078.101196,
+            "id": 63,
+            "co2_deleted": false,
+            "co2": 227618.078125,
+            "ch4_deleted": false,
+            "ch4": 24.967705
+        }, {
+            "sampled_at": "2016-05-20T09:30:00",
+            "n2o_deleted": null,
+            "n2o": 1009.84021,
+            "id": 62,
+            "co2_deleted": false,
+            "co2": 189666.828125,
+            "ch4_deleted": false,
+            "ch4": 24.237082
+        }, {
+            "sampled_at": "2016-05-20T09:30:00",
+            "n2o_deleted": null,
+            "n2o": 1188.570923,
+            "id": 64,
+            "co2_deleted": false,
+            "co2": 282831.25,
+            "ch4_deleted": false,
+            "ch4": 23.825558
+        }],
+        "id": 16,
+        "height": 19.625
+    }
+  }
   """
 
 
 nextJson : String
 nextJson =
     """
-  {
-    "data": [
-        {
-            "sampled_at": "2011-05-04T19:16:52.393222",
-            "n2o_ppm": 0.24854400157928467,
-            "incubation_id": 50203,
-            "id": 264623,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 104.1361083984375,
-            "ch4_ppm": 1.6629305362701416
-        },
-        {
-            "sampled_at": "2011-05-04T19:35:29.709224",
-            "n2o_ppm": 0.25114768147468567,
-            "incubation_id": 50203,
-            "id": 264636,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 63.04869842529297,
-            "ch4_ppm": 2.1213671875
-        },
-        {
-            "sampled_at": "2011-05-04T20:11:15.849210",
-            "n2o_ppm": 0.3841080057621002,
-            "incubation_id": 50203,
-            "id": 264644,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 64.137939453125,
-            "ch4_ppm": 1.9641358613967896
-        },
-        {
-            "sampled_at": "2011-05-04T19:53:22.905214",
-            "n2o_ppm": 0.45141608119010925,
-            "incubation_id": 50203,
-            "id": 264640,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": 746.5516967773438,
-            "ch4_ppm": 1.8520569801330566
-        },
-        {
-            "sampled_at": "2011-05-04T20:29:09.113220",
-            "n2o_ppm": 0.4564942479133606,
-            "incubation_id": 50203,
-            "id": 264648,
-            "fid_mv": null,
-            "ecd_mv": null,
-            "co2_ppm": -50,
-            "ch4_ppm": 1.8188018798828125
-        }
-    ]
-}
+    {
+    "data": {
+        "sampled_at": "2016-05-31T15:00:00",
+        "injections": [{
+            "sampled_at": "2016-05-31T15:00:00",
+            "n2o_deleted": null,
+            "n2o": 984.054749,
+            "id": 109,
+            "co2_deleted": false,
+            "co2": 148110.140625,
+            "ch4_deleted": false,
+            "ch4": 21.499937
+        }, {
+                    "sampled_at": "2016-05-31T15:00:00",
+                    "n2o_deleted": null,
+                    "n2o": 1187.261353,
+                    "id": 111,
+                    "co2_deleted": false,
+                    "co2": 419945.34375,
+                    "ch4_deleted": false,
+                    "ch4": 21.085075
+                }, {
+                            "sampled_at": "2016-05-31T15:00:00",
+                            "n2o_deleted": null,
+                            "n2o": 1281.096558,
+                            "id": 112,
+                            "co2_deleted": false,
+                            "co2": 558592.5,
+                            "ch4_deleted": false,
+                            "ch4": 20.934746
+                        }, {
+                                    "sampled_at": "2016-05-31T15:00:00",
+                                    "n2o_deleted": null,
+                                    "n2o": 1060.04895,
+                                    "id": 110,
+                                    "co2_deleted": false,
+                                    "co2": 298877.28125,
+                                    "ch4_deleted": false,
+                                    "ch4": 21.336681
+                                }],
+        "id": 28,
+        "height": 19.5
+    }
+  }
   """
