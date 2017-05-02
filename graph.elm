@@ -25,9 +25,9 @@ type alias Flux =
 
 
 type alias Incubation =
-    { co2 : Flux
-    , ch4 : Flux
-    , n2o : Flux
+    { co2_flux : Flux
+    , ch4_flux : Flux
+    , n2o_flux : Flux
     , injections : List Injection
     , standards : List Standard
     , co2_calibration : Flux
@@ -412,6 +412,15 @@ interval startTime time =
     ((Date.toTime time) - Date.toTime (startTime)) / 1000 / 60
 
 
+toFit : List Point -> Flux
+toFit points =
+    let
+        fit =
+            fitLineByLeastSquares points
+    in
+        fluxWithDefault fit
+
+
 fluxWithDefault : Result String Fit -> Flux
 fluxWithDefault fit =
     case fit of
@@ -425,23 +434,14 @@ fluxWithDefault fit =
 toIncubation : List Injection -> List Standard -> Incubation
 toIncubation injections standards =
     let
-        fit =
-            fitLineByLeastSquares (co2_injections injections)
-
         co2s =
-            fluxWithDefault fit
-
-        fitch4 =
-            fitLineByLeastSquares (ch4_injections injections)
+            toFit (co2_injections injections)
 
         ch4s =
-            fluxWithDefault fitch4
-
-        fitn2o =
-            fitLineByLeastSquares (n2o_injections injections)
+            toFit (ch4_injections injections)
 
         n2os =
-            fluxWithDefault fitn2o
+            toFit (n2o_injections injections)
     in
         Incubation
             co2s
@@ -928,43 +928,79 @@ update msg model =
     case msg of
         SwitchInjection CO2 point ->
             let
-                new_incubation =
+                updated_incubation =
                     updateIncubation model.incubation (update_co2_injections) point
+
+                new_flux =
+                    toFit (co2_injections updated_incubation.injections)
+
+                new_incubation =
+                    { updated_incubation | co2_flux = new_flux }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
         SwitchInjection CH4 point ->
             let
-                new_incubation =
+                updated_incubation =
                     updateIncubation model.incubation (update_ch4_injections) point
+
+                new_flux =
+                    toFit (ch4_injections updated_incubation.injections)
+
+                new_incubation =
+                    { updated_incubation | ch4_flux = new_flux }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
         SwitchInjection N2O point ->
             let
-                new_incubation =
+                updated_incubation =
                     updateIncubation model.incubation (update_n2o_injections) point
+
+                new_flux =
+                    toFit (n2o_injections updated_incubation.injections)
+
+                new_incubation =
+                    { updated_incubation | n2o_flux = new_flux }
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
         SwitchStandard CO2 point ->
             let
-                newIncubation =
+                updatedIncubation =
                     updateStandard model.incubation (updateCO2Standards) point
+
+                new_flux =
+                    toFit (co2_standards updatedIncubation.standards)
+
+                newIncubation =
+                    { updatedIncubation | co2_calibration = new_flux }
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
         SwitchStandard CH4 point ->
             let
-                newIncubation =
+                updatedIncubation =
                     updateStandard model.incubation (updateCH4Standards) point
+
+                new_flux =
+                    toFit (ch4_standards updatedIncubation.standards)
+
+                newIncubation =
+                    { updatedIncubation | ch4_calibration = new_flux }
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
         SwitchStandard N2O point ->
             let
-                newIncubation =
+                updatedIncubation =
                     updateStandard model.incubation (updateN2OStandards) point
+
+                new_flux =
+                    toFit (n2o_standards updatedIncubation.standards)
+
+                newIncubation =
+                    { updatedIncubation | n2o_calibration = new_flux }
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
