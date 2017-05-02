@@ -752,9 +752,10 @@ draw_graph drawing_func points flux =
             toYAxis points
     in
         svg
-            [ width (toString (xAxis.max_extent + 10))
-            , height (toString (yAxis.max_extent * 2))
-            , viewBox (viewBox_ xAxis yAxis)
+            [ width (toString (xAxis.max_extent + x_offset + 50))
+            , height (toString (yAxis.max_extent + y_offset + 50))
+
+            -- , viewBox (viewBox_ xAxis yAxis)
             ]
             [ g [ transform translateCoords ]
                 [ g []
@@ -819,6 +820,28 @@ injectionDots gas points =
         List.map (\x -> dotTransform (SwitchInjection gas x) x) points
 
 
+renderListElement : Point -> Html Msg
+renderListElement point =
+    let
+        msg =
+            String.concat
+                [ "id = "
+                , toString point.id
+                , " x = "
+                , toString point.x
+                , " y = "
+                , toString point.y
+                ]
+    in
+        li [] [ Html.text msg ]
+
+
+renderList : List Point -> Html Msg
+renderList points =
+    ul []
+        (List.map (\x -> renderListElement x) points)
+
+
 view : Model -> Html Msg
 view model =
     div []
@@ -870,114 +893,78 @@ fetchNextIncubation =
         |> Http.send LoadIncubation
 
 
+updateIncubation : Incubation -> (List Injection -> Point -> List Injection) -> Point -> Incubation
+updateIncubation incubation updater point =
+    let
+        new_point =
+            { point | deleted = not point.deleted }
+
+        new_injections =
+            updater incubation.injections new_point
+
+        new_incubation =
+            { incubation | injections = new_injections }
+    in
+        new_incubation
+
+
+updateStandard : Incubation -> (List Standard -> Point -> List Standard) -> Point -> Incubation
+updateStandard incubation updater point =
+    let
+        new_point =
+            { point | deleted = not point.deleted }
+
+        new_standards =
+            updater incubation.standards new_point
+
+        new_incubation =
+            { incubation | standards = new_standards }
+    in
+        new_incubation
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SwitchInjection CO2 point ->
             let
-                new_point =
-                    { point | deleted = not point.deleted }
-
-                incubation =
-                    model.incubation
-
-                new_injections =
-                    update_co2_injections incubation.injections new_point
-
                 new_incubation =
-                    { incubation | injections = new_injections }
-
-                _ =
-                    Debug.log "co2 old " incubation
-
-                _ =
-                    Debug.log "co2 new " new_incubation
+                    updateIncubation model.incubation (update_co2_injections) point
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
         SwitchInjection CH4 point ->
             let
-                new_point =
-                    { point | deleted = not point.deleted }
-
-                incubation =
-                    model.incubation
-
-                new_injections =
-                    update_ch4_injections incubation.injections new_point
-
                 new_incubation =
-                    { incubation | injections = new_injections }
+                    updateIncubation model.incubation (update_ch4_injections) point
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
         SwitchInjection N2O point ->
             let
-                new_point =
-                    { point | deleted = not point.deleted }
-
-                incubation =
-                    model.incubation
-
-                new_injections =
-                    update_n2o_injections incubation.injections new_point
-
                 new_incubation =
-                    { incubation | injections = new_injections }
-
-                _ =
-                    Debug.log "old " incubation
-
-                _ =
-                    Debug.log "new " new_incubation
+                    updateIncubation model.incubation (update_n2o_injections) point
             in
                 ( { model | incubation = new_incubation }, Cmd.none )
 
         SwitchStandard CO2 point ->
             let
-                newPoint =
-                    { point | deleted = not point.deleted }
-
-                incubation =
-                    model.incubation
-
-                newStandards =
-                    updateCO2Standards incubation.standards newPoint
-
                 newIncubation =
-                    { incubation | standards = newStandards }
+                    updateStandard model.incubation (updateCO2Standards) point
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
         SwitchStandard CH4 point ->
             let
-                newPoint =
-                    { point | deleted = not point.deleted }
-
-                incubation =
-                    model.incubation
-
-                newStandards =
-                    updateCH4Standards incubation.standards newPoint
-
                 newIncubation =
-                    { incubation | standards = newStandards }
+                    updateStandard model.incubation (updateCH4Standards) point
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
         SwitchStandard N2O point ->
             let
-                newPoint =
-                    { point | deleted = not point.deleted }
-
-                incubation =
-                    model.incubation
-
-                newStandards =
-                    updateN2OStandards incubation.standards newPoint
-
                 newIncubation =
-                    { incubation | standards = newStandards }
+                    updateStandard model.incubation (updateN2OStandards) point
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 

@@ -84,19 +84,19 @@ all =
             [ test "extract c2o point list" <|
                 \() ->
                     co2_injections [ injection1, injection2 ]
-                        |> Expect.equal [ (Point 500 0 False 1), (Point 600 5 False 2) ]
+                        |> Expect.equal [ (Point 0 500 False 1), (Point 5 600 False 2) ]
             , test "extract n2o point list" <|
                 \() ->
                     n2o_injections [ injection1, injection2 ]
-                        |> Expect.equal [ (Point 0.3 0 False 1), (Point 0.6 5 False 2) ]
+                        |> Expect.equal [ (Point 0 0.3 False 1), (Point 5 0.6 False 2) ]
             , test "extract ch4 point list" <|
                 \() ->
                     ch4_injections [ injection1, injection2 ]
-                        |> Expect.equal [ (Point 2 0 False 1), (Point 1 5 False 2) ]
+                        |> Expect.equal [ (Point 0 2 False 1), (Point 5 1 False 2) ]
             , test "extract c2o point list reversed " <|
                 \() ->
                     co2_injections [ injection2, injection1 ]
-                        |> Expect.equal [ (Point 600 5 False 2), (Point 500 0 False 1) ]
+                        |> Expect.equal [ (Point 5 600 False 2), (Point 0 500 False 1) ]
             ]
         , describe "transfrom from point to injection"
             [ test "update injections from N2O point with matching id" <|
@@ -109,7 +109,7 @@ all =
                             DE.fromParts 2017 May 1 12 50 0 0
                     in
                         updateN2OInjection injection1 n2oPoint
-                            |> Expect.equal (Injection 500 8 2 1 False False False date)
+                            |> Expect.equal (Injection 500 9 2 1 False False False date)
             ]
         , describe "least squares fit"
             [ test "simple fit" <|
@@ -127,6 +127,26 @@ all =
                             Ok fit ->
                                 fit.slope
                                     |> Expect.equal 1
+
+                            Err msg ->
+                                msg
+                                    |> Expect.equal "error"
+            , test "more complex fit" <|
+                \() ->
+                    let
+                        points =
+                            [ Point 0 0 False 1
+                            , Point 10 6 False 2
+                            , Point 10 4 False 3
+                            ]
+
+                        result =
+                            fitLineByLeastSquares points
+                    in
+                        case result of
+                            Ok fit ->
+                                fit.slope
+                                    |> Expect.equal 0.5
 
                             Err msg ->
                                 msg
