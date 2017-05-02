@@ -27,11 +27,11 @@ type alias Flux =
 
 
 type alias Incubation =
-    { co2_flux : Maybe Flux
+    { injections : List Injection
+    , standards : List Standard
+    , co2_flux : Maybe Flux
     , ch4_flux : Maybe Flux
     , n2o_flux : Maybe Flux
-    , injections : List Injection
-    , standards : List Standard
     , co2_calibration : Maybe Flux
     , ch4_calibration : Maybe Flux
     , n2o_calibration : Maybe Flux
@@ -447,11 +447,11 @@ toIncubation injections standards =
             toFit (n2o_injections injections)
     in
         Incubation
+            injections
+            initialStandards
             (Just co2s)
             (Just ch4s)
             (Just n2os)
-            injections
-            initialStandards
             Nothing
             Nothing
             Nothing
@@ -481,24 +481,45 @@ date =
         JD.string |> JD.andThen convert
 
 
+fluxDecoder : Decoder Flux
+fluxDecoder =
+    decode Flux
+        |> required "slope" float
+        |> required "intercept" float
+        |> required "r2" float
 
--- incubationDecoder : Decoder Incubation
--- incubationDecoder =
---     decode Incubation
---         |> hardcoded "co2_flux" nullFlux
---         |> hardcoded "ch4_flux" nullFlux
---         |> hardcoded "n2o_flux" nullFlux
---         |> required "injections" (list injectionDecoder)
---         |> optional "standards" (list standardDecoder) []
---         |> hardcoded "co2_calibration" nullFlux
---         |> hardcoded "ch4_calibration" nullFlux
---         |> hardcoded "n2o_calibration" nullFlux
---
---
--- responseIncubationDecoder : Decoder (List Incubation)
--- responseIncubationDecoder =
---     decode identity
---         |> required "data" (list incubationDecoder)
+
+incubationDecoder : Decoder Incubation
+incubationDecoder =
+    decode Incubation
+        |> required "injections" (list injectionDecoder)
+        |> optional "standards" (list standardDecoder) []
+        |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
+        |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
+        |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
+        |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
+        |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
+        |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
+
+
+responseIncubationDecoder : Decoder (List Incubation)
+responseIncubationDecoder =
+    decode identity
+        |> required "data" (list incubationDecoder)
+
+
+decodeIncubations : String -> List Incubation
+decodeIncubations json =
+    case decodeString responseIncubationDecoder json of
+        Ok listOfIncubations ->
+            listOfIncubations
+
+        Err msg ->
+            let
+                _ =
+                    Debug.log "ERROR:" msg
+            in
+                []
 
 
 injectionDecoder : Decoder Injection

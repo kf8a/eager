@@ -161,7 +161,7 @@ all =
                     in
                         axisTransform axis value
                             |> Expect.equal (value / 2)
-            , fuzz float "it retuns a value in the extent range" <|
+            , fuzz (floatRange 0 100) "it retuns a value in the extent range" <|
                 \value ->
                     let
                         axis =
@@ -172,22 +172,6 @@ all =
                     in
                         ((output >= 0) && (output <= 60))
                             |> Expect.true "Expected result be within extent range"
-            , fuzz (floatRange 101 1000) "it retuns the upper range if above range" <|
-                \value ->
-                    let
-                        axis =
-                            Axis 0 60 0 100
-                    in
-                        axisTransform axis value
-                            |> Expect.equal 60
-            , fuzz (floatRange -101 0) "it retuns the lower range if below range" <|
-                \value ->
-                    let
-                        axis =
-                            Axis 0 60 0 100
-                    in
-                        axisTransform axis value
-                            |> Expect.equal 0
             ]
         , describe "incubations decoder"
             [ test "it parses correct json" <|
@@ -197,7 +181,7 @@ all =
                             """{"data":{"sampled_at":"2016-05-31T15:00:00","injections":[{"sampled_at":"2016-05-31T15:00:00","n2o_deleted":null,"n2o":984.054749,"id":109,"co2_deleted":false,"co2":148110.140625,"ch4_deleted":false,"ch4":21.499937},{"sampled_at":"2016-05-31T15:00:00","n2o_deleted":null,"n2o":1187.261353,"id":111,"co2_deleted":false,"co2":419945.34375,"ch4_deleted":false,"ch4":21.085075},{"sampled_at":"2016-05-31T15:00:00","n2o_deleted":null,"n2o":1281.096558,"id":112,"co2_deleted":false,"co2":558592.5,"ch4_deleted":false,"ch4":20.934746},{"sampled_at":"2016-05-31T15:00:00","n2o_deleted":null,"n2o":1060.04895,"id":110,"co2_deleted":false,"co2":298877.28125,"ch4_deleted":false,"ch4":21.336681}],"id":28,"height":19.5}}"""
                     in
                         json
-                            |> decodeIncubation
+                            |> decodeIncubations
                             |> List.length
                             |> Expect.equal 1
             ]
