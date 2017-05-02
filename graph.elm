@@ -14,6 +14,7 @@ import Svg.Events exposing (..)
 import List.Extra as LE
 import Http
 import LeastSquares exposing (..)
+import Round exposing (..)
 import SampleIncubation exposing (json, nextJson)
 
 
@@ -681,7 +682,12 @@ drawRegressionLine xAxis yAxis flux =
             [ x1 (toString (xAxisTransform xAxis.min_value))
             , x2 (toString (xAxisTransform xAxis.max_value))
             , y1 (toString (yAxis.max_extent - (yAxisTransform flux.intercept)))
-            , y2 (toString (yAxis.max_extent - (yAxisTransform (flux.slope * xAxis.max_value))))
+            , y2
+                (toString
+                    (yAxis.max_extent
+                        - (yAxisTransform (flux.intercept + flux.slope * xAxis.max_value))
+                    )
+                )
             , stroke "black"
             , fill "black"
             ]
@@ -700,7 +706,7 @@ draw_standards gas points =
         my_dots =
             standardDots gas points
     in
-        draw_graph my_dots points flux
+        draw_graph my_dots (toString gas) points flux
 
 
 draw_injections : Gas -> List Point -> Svg Msg
@@ -715,17 +721,32 @@ draw_injections gas points =
         my_dots =
             injectionDots gas points
     in
-        draw_graph my_dots points flux
+        draw_graph my_dots (toString gas) points flux
 
 
-draw_graph : List (Svg Msg) -> List Point -> Flux -> Svg Msg
-draw_graph drawing_func points flux =
+draw_graph : List (Svg Msg) -> String -> List Point -> Flux -> Svg Msg
+draw_graph drawing_func label points flux =
     let
         xAxis =
             toXAxis points
 
         yAxis =
             toYAxis points
+
+        eq =
+            String.concat
+                [ "y = "
+                , Round.round 2 flux.intercept
+                , " + "
+                , Round.round 4 flux.slope
+                , " x"
+                ]
+
+        r =
+            String.concat
+                [ "r = "
+                , Round.round 3 flux.r2
+                ]
     in
         svg
             [ width (toString (xAxis.max_extent + x_offset + 50))
@@ -740,6 +761,11 @@ draw_graph drawing_func points flux =
                 , g []
                     [ drawXAxis xAxis yAxis
                     , drawYAxis xAxis yAxis
+                    ]
+                , g []
+                    [ text_ [ x "10", y "20" ] [ Svg.text label ]
+                    , text_ [ x "10", y "40" ] [ Svg.text eq ]
+                    , text_ [ x "10", y "60" ] [ Svg.text r ]
                     ]
                 ]
             ]
@@ -883,9 +909,13 @@ updateIncubation incubation updater point =
     in
         new_incubation
 
+
+
 --- todo  move flux updating here by passing in the extractor
+
+
 updateStandard : Incubation -> (List Standard -> Point -> List Standard) -> Point -> Incubation
-updateStandard incubation updater extractor point =
+updateStandard incubation updater point =
     let
         new_point =
             { point | deleted = not point.deleted }
