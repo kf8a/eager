@@ -571,7 +571,12 @@ axisTransform axis value =
     else if value < axis.min_value then
         axis.min_extent
     else
-        (axis.max_extent / (axis.max_value - axis.min_value) * value)
+        unboundedAxisTransform axis value
+
+
+unboundedAxisTransform : Axis -> Float -> Float
+unboundedAxisTransform axis value =
+    (axis.max_extent / (axis.max_value - axis.min_value) * value)
 
 
 pointColor : Bool -> String
@@ -673,10 +678,10 @@ drawRegressionLine : Axis -> Axis -> Flux -> Svg Msg
 drawRegressionLine xAxis yAxis flux =
     let
         xAxisTransform =
-            axisTransform xAxis
+            unboundedAxisTransform xAxis
 
         yAxisTransform =
-            axisTransform yAxis
+            unboundedAxisTransform yAxis
     in
         line
             [ x1 (toString (xAxisTransform xAxis.min_value))
