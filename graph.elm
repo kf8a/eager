@@ -131,6 +131,20 @@ initialStandard =
     }
 
 
+initialIncubation : Incubation
+initialIncubation =
+    { injections = []
+    , standards = []
+    , id = 0
+    , co2_flux = Nothing
+    , ch4_flux = Nothing
+    , n2o_flux = Nothing
+    , co2_calibration = Nothing
+    , ch4_calibration = Nothing
+    , n2o_calibration = Nothing
+    }
+
+
 initialStandards : List Standard
 initialStandards =
     [ initialStandard ]
@@ -505,15 +519,31 @@ incubationDecoder =
         |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
 
 
-responseIncubationDecoder : Decoder (List Incubation)
+responseIncubationDecoder : Decoder Incubation
 responseIncubationDecoder =
+    decode identity
+        |> required "data" incubationDecoder
+
+
+decodeIncubation : String -> Incubation
+decodeIncubation json =
+    case decodeString responseIncubationDecoder json of
+        Ok incubation ->
+            incubation
+
+        Err msg ->
+            initialIncubation
+
+
+responseIncubationListDecoder : Decoder (List Incubation)
+responseIncubationListDecoder =
     decode identity
         |> required "data" (list incubationDecoder)
 
 
-decodeIncubations : String -> List Incubation
-decodeIncubations json =
-    case decodeString responseIncubationDecoder json of
+decodeIncubationList : String -> List Incubation
+decodeIncubationList json =
+    case decodeString responseIncubationListDecoder json of
         Ok listOfIncubations ->
             listOfIncubations
 
