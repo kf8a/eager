@@ -29,6 +29,7 @@ type alias Flux =
 type alias Incubation =
     { injections : List Injection
     , standards : List Standard
+    , id : Int
     , co2_flux : Maybe Flux
     , ch4_flux : Maybe Flux
     , n2o_flux : Maybe Flux
@@ -449,6 +450,7 @@ toIncubation injections standards =
         Incubation
             injections
             initialStandards
+            1
             (Just co2s)
             (Just ch4s)
             (Just n2os)
@@ -494,6 +496,7 @@ incubationDecoder =
     decode Incubation
         |> required "injections" (list injectionDecoder)
         |> optional "standards" (list standardDecoder) []
+        |> required "id" int
         |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
@@ -525,9 +528,9 @@ decodeIncubations json =
 injectionDecoder : Decoder Injection
 injectionDecoder =
     decode Injection
-        |> required "co2_ppm" float
-        |> required "n2o_ppm" float
-        |> required "ch4_ppm" float
+        |> required "co2" float
+        |> required "n2o" float
+        |> required "ch4" float
         |> required "id" int
         |> optional "n2o_deleted" bool False
         |> optional "co2_deleted" bool False
@@ -538,7 +541,7 @@ injectionDecoder =
 responseDecoder : Decoder (List Injection)
 responseDecoder =
     decode identity
-        |> required "data" (list injectionDecoder)
+        |> required "injections" (list injectionDecoder)
 
 
 decodeInjections : String -> List Injection
@@ -548,7 +551,11 @@ decodeInjections json =
             listOfInjections
 
         Err msg ->
-            []
+            let
+                _ =
+                    Debug.log "ERROR decoding injections:" msg
+            in
+                []
 
 
 decodeStandards : String -> List Standard
