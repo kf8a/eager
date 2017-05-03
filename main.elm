@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Graph exposing (..)
+import Data exposing (..)
 import Html
 
 

@@ -4,6 +4,7 @@ import Test exposing (..)
 import Fuzz exposing (..)
 import Expect exposing (Expectation)
 import Json.Decode exposing (decodeString, Value)
+import Json.Encode exposing (encode)
 import String
 import Graph exposing (..)
 import LeastSquares exposing (..)
@@ -172,6 +173,18 @@ all =
                     in
                         ((output >= 0) && (output <= 60))
                             |> Expect.true "Expected result be within extent range"
+            ]
+        , describe "injection encoder"
+            [ test "it encodes an injection" <|
+                \() ->
+                    let
+                        result =
+                            injectionEncoder injection1
+                                |> encode 0
+                                |> decodeInjection
+                    in
+                        result
+                            |> Expect.equal injection1
             ]
         , describe "injection decoder"
             [ test "it parses correct json" <|

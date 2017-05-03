@@ -3,8 +3,6 @@ module Graph exposing (..)
 import Date exposing (..)
 import Date.Extra as DE exposing (..)
 import Time exposing (..)
-import Json.Decode as JD exposing (..)
-import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Html
 import Html exposing (..)
 import Html exposing (program, Html)
@@ -14,83 +12,17 @@ import Svg.Attributes exposing (..)
 import Svg.Events exposing (..)
 import List.Extra as LE
 import Http
+import HttpBuilder exposing (..)
 import LeastSquares exposing (..)
 import Round exposing (..)
 import SampleIncubation exposing (json, nextJson)
-
-
-type alias Flux =
-    { slope : Float
-    , intercept : Float
-    , r2 : Float
-    }
-
-
-type alias Incubation =
-    { injections : List Injection
-    , standards : List Standard
-    , id : Int
-    , co2_flux : Maybe Flux
-    , ch4_flux : Maybe Flux
-    , n2o_flux : Maybe Flux
-    , co2_calibration : Maybe Flux
-    , ch4_calibration : Maybe Flux
-    , n2o_calibration : Maybe Flux
-    }
-
-
-type alias Standard =
-    { n2o_ppm : Float
-    , n2o_mv : Float
-    , co2_ppm : Float
-    , co2_mv : Float
-    , ch4_ppm : Float
-    , ch4_mv : Float
-    , n2o_deleted : Bool
-    , co2_deleted : Bool
-    , ch4_deleted : Bool
-    , id : Int
-    }
-
-
-type alias Axis =
-    { min_extent : Float
-    , max_extent : Float
-    , min_value : Float
-    , max_value : Float
-    }
-
-
-type alias Model =
-    { incubation : Incubation
-    , next_incubation : Incubation
-    , status : Status
-    }
-
-
-type alias Injection =
-    { co2_ppm : Float
-    , n2o_ppm : Float
-    , ch4_ppm : Float
-    , id : Int
-    , co2_deleted : Bool
-    , n2o_deleted : Bool
-    , ch4_deleted : Bool
-    , datetime : Date
-    }
+import Data exposing (..)
 
 
 type Gas
     = CO2
     | N2O
     | CH4
-
-
-type Status
-    = Good
-    | Bad
-    | MaybeGood
-    | NotChecked
 
 
 type Msg
@@ -101,7 +33,9 @@ type Msg
     | FluxBad Incubation
     | LoadIncubation (Result Http.Error (List Injection))
     | LoadStandard (Result Http.Error (List Standard))
-    | SaveStandard (List Standard)
+    | SavedStandard (Result Http.Error String)
+    | SavedIncubation (Result Http.Error Incubation)
+    | NoOp
 
 
 initialModel : Model
@@ -131,48 +65,13 @@ initialStandard =
     }
 
 
-initialIncubation : Incubation
-initialIncubation =
-    { injections = []
-    , standards = []
-    , id = 0
-    , co2_flux = Nothing
-    , ch4_flux = Nothing
-    , n2o_flux = Nothing
-    , co2_calibration = Nothing
-    , ch4_calibration = Nothing
-    , n2o_calibration = Nothing
-    }
-
-
 initialStandards : List Standard
 initialStandards =
     [ initialStandard ]
 
 
-sortedRecords : Injection -> Injection -> Order
-sortedRecords a b =
-    DE.compare a.datetime b.datetime
-
-
 
 -- Point extractors
-
-
-co2_standards : List Standard -> List Point
-co2_standards standards =
-    List.map (\x -> Point x.co2_ppm x.co2_mv x.co2_deleted x.id) standards
-
-
-n2o_standards : List Standard -> List Point
-n2o_standards standards =
-    List.map (\x -> Point x.n2o_ppm x.n2o_mv x.n2o_deleted x.id) standards
-
-
-ch4_standards : List Standard -> List Point
-ch4_standards standards =
-    List.map (\x -> Point x.ch4_ppm x.ch4_mv x.ch4_deleted x.id) standards
-        |> List.filter (\x -> x.y /= 0.0)
 
 
 co2_injections : List Injection -> List Point
@@ -200,6 +99,51 @@ ch4_injections injections =
             interval (initialTime injections)
     in
         List.map (\x -> Point (pointInterval x.datetime) x.ch4_ppm x.ch4_deleted x.id) injections
+
+
+
+-- Translators
+
+
+initialTime : List Injection -> Date
+initialTime injections =
+    let
+        sorted =
+            List.sortWith sortedRecords injections
+
+        firstRecord =
+            List.head sorted
+    in
+        case firstRecord of
+            Just injection ->
+                injection.datetime
+
+            Nothing ->
+                Date.fromTime (Time.inSeconds 0)
+
+
+interval : Date -> Date -> Float
+interval startTime time =
+    ((Date.toTime time) - Date.toTime (startTime)) / 1000 / 60
+
+
+toFit : List Point -> Flux
+toFit points =
+    let
+        fit =
+            fitLineByLeastSquares points
+    in
+        fluxWithDefault fit
+
+
+fluxWithDefault : Result String Fit -> Flux
+fluxWithDefault fit =
+    case fit of
+        Ok fit ->
+            Flux fit.slope fit.intercept fit.r2
+
+        Err message ->
+            Flux 0 0 0
 
 
 
@@ -408,47 +352,6 @@ update_n2o_injections injections n2o =
 -- Translators
 
 
-initialTime : List Injection -> Date
-initialTime injections =
-    let
-        sorted =
-            List.sortWith sortedRecords injections
-
-        firstRecord =
-            List.head sorted
-    in
-        case firstRecord of
-            Just injection ->
-                injection.datetime
-
-            Nothing ->
-                Date.fromTime (Time.inSeconds 0)
-
-
-interval : Date -> Date -> Float
-interval startTime time =
-    ((Date.toTime time) - Date.toTime (startTime)) / 1000 / 60
-
-
-toFit : List Point -> Flux
-toFit points =
-    let
-        fit =
-            fitLineByLeastSquares points
-    in
-        fluxWithDefault fit
-
-
-fluxWithDefault : Result String Fit -> Flux
-fluxWithDefault fit =
-    case fit of
-        Ok fit ->
-            Flux fit.slope fit.intercept fit.r2
-
-        Err message ->
-            Flux 0 0 0
-
-
 toIncubation : List Injection -> List Standard -> Incubation
 toIncubation injections standards =
     let
@@ -471,158 +374,6 @@ toIncubation injections standards =
             Nothing
             Nothing
             Nothing
-
-
-nullFlux : Flux
-nullFlux =
-    Flux 0 0 0
-
-
-
--- Decoders
-
-
-date : Decoder Date
-date =
-    let
-        convert : String -> Decoder Date
-        convert raw =
-            case Date.fromString raw of
-                Ok date ->
-                    succeed date
-
-                Err msg ->
-                    fail msg
-    in
-        JD.string |> JD.andThen convert
-
-
-fluxDecoder : Decoder Flux
-fluxDecoder =
-    decode Flux
-        |> required "slope" float
-        |> required "intercept" float
-        |> required "r2" float
-
-
-incubationDecoder : Decoder Incubation
-incubationDecoder =
-    decode Incubation
-        |> required "injections" (list injectionDecoder)
-        |> optional "standards" (list standardDecoder) []
-        |> required "id" int
-        |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
-        |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
-        |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
-        |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
-        |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
-        |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
-
-
-responseIncubationDecoder : Decoder Incubation
-responseIncubationDecoder =
-    decode identity
-        |> required "data" incubationDecoder
-
-
-decodeIncubation : String -> Incubation
-decodeIncubation json =
-    case decodeString responseIncubationDecoder json of
-        Ok incubation ->
-            incubation
-
-        Err msg ->
-            initialIncubation
-
-
-responseIncubationListDecoder : Decoder (List Incubation)
-responseIncubationListDecoder =
-    decode identity
-        |> required "data" (list incubationDecoder)
-
-
-decodeIncubationList : String -> List Incubation
-decodeIncubationList json =
-    case decodeString responseIncubationListDecoder json of
-        Ok listOfIncubations ->
-            listOfIncubations
-
-        Err msg ->
-            let
-                _ =
-                    Debug.log "ERROR:" msg
-            in
-                []
-
-
-injectionDecoder : Decoder Injection
-injectionDecoder =
-    decode Injection
-        |> required "co2" float
-        |> required "n2o" float
-        |> required "ch4" float
-        |> required "id" int
-        |> optional "n2o_deleted" bool False
-        |> optional "co2_deleted" bool False
-        |> optional "ch4_deleted" bool False
-        |> required "sampled_at" date
-
-
-responseDecoder : Decoder (List Injection)
-responseDecoder =
-    decode identity
-        |> required "injections" (list injectionDecoder)
-
-
-decodeInjections : String -> List Injection
-decodeInjections json =
-    case decodeString responseDecoder json of
-        Ok listOfInjections ->
-            listOfInjections
-
-        Err msg ->
-            let
-                _ =
-                    Debug.log "ERROR decoding injections:" msg
-            in
-                []
-
-
-decodeStandards : String -> List Standard
-decodeStandards json =
-    case decodeString standardResponseDecoder json of
-        Ok standards ->
-            standards
-
-        Err msg ->
-            []
-
-
-standardDecoder : Decoder Standard
-standardDecoder =
-    decode Standard
-        |> required "n2o_ppm" float
-        |> required "n2o_mv" float
-        |> required "co2_ppm" float
-        |> required "co2_mv" float
-        |> required "ch4_ppm" float
-        |> required "ch4_mv" float
-        |> hardcoded False
-        |> hardcoded False
-        |> hardcoded False
-        |> required "id" int
-
-
-standardDataDecoder : Decoder (List Standard)
-standardDataDecoder =
-    decode identity
-        |> required "standards" (list standardDecoder)
-
-
-standardResponseDecoder : Decoder (List Standard)
-standardResponseDecoder =
-    decode identity
-        |> required "data" standardDataDecoder
 
 
 
@@ -995,6 +746,35 @@ fetchNextIncubation =
         |> Http.send LoadIncubation
 
 
+standardSaved : Result Http.Error () -> Msg
+standardSaved result =
+    case result of
+        Ok _ ->
+            NoOp
+
+        Err msg ->
+            let
+                _ =
+                    Debug.log "ERROR standardSaved  " msg
+            in
+                NoOp
+
+
+saveStandard : List Standard -> Cmd Msg
+saveStandard standardList =
+    HttpBuilder.post "http://localhost:4000/api/standards"
+        |> withQueryParams [ ( "hello", "world" ) ]
+        |> withHeader "X-My-Header" "Some Header Value"
+        |> withJsonBody (standardListEncoder standardList)
+        |> withTimeout (10 * Time.second)
+        |> withCredentials
+        |> send standardSaved
+
+
+
+-- |> withJsonBody (standardListEncoder standardList)
+
+
 updateIncubation : Incubation -> (List Injection -> Point -> List Injection) -> Point -> Incubation
 updateIncubation incubation updater point =
     let
@@ -1131,13 +911,24 @@ update msg model =
             in
                 ( { new_model | status = Bad }, fetchNextIncubation )
 
+        SavedIncubation (Ok incubation) ->
+            ( model, fetchNextIncubation )
+
+        SavedIncubation (Err msg) ->
+            let
+                _ =
+                    Debug.log "error Saving" msg
+            in
+                --- TODO: need to alert the user that something failed
+                ( model, Cmd.none )
+
         LoadIncubation (Ok injections) ->
             let
                 _ =
                     Debug.log "ok incubation" injections
 
                 newModel =
-                    Debug.log "new model" { model | next_incubation = (toIncubation injections initialStandards) }
+                    { model | next_incubation = (toIncubation injections initialStandards) }
             in
                 ( newModel, Cmd.none )
 
@@ -1165,7 +956,14 @@ update msg model =
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
-        SaveStandard standards ->
+        SavedStandard (Ok _) ->
+            ( model, Cmd.none )
+
+        SavedStandard (Err msg) ->
+            --TODO handle error when saving
+            ( model, Cmd.none )
+
+        NoOp ->
             ( model, Cmd.none )
 
 
