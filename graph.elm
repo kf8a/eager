@@ -47,6 +47,8 @@ initialModel =
     , next_incubation =
         toIncubation (decodeInjections SampleIncubation.nextJson)
             initialStandards
+    , run = initialRun
+    , next_run = Nothing
     , status = NotChecked
     }
 

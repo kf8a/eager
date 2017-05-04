@@ -66,6 +66,8 @@ type alias Axis =
 type alias Model =
     { incubation : Incubation
     , next_incubation : Incubation
+    , run : Run
+    , next_run : Maybe Run
     , status : Status
     }
 
@@ -105,6 +107,11 @@ initialIncubation =
     , ch4_calibration = Nothing
     , n2o_calibration = Nothing
     }
+
+
+initialRun : Run
+initialRun =
+    Run 0 "nothing" [] [] [] Nothing Nothing Nothing
 
 
 sortedRecords : Injection -> Injection -> Order
