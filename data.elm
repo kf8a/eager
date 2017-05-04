@@ -16,6 +16,18 @@ type alias Flux =
     }
 
 
+type alias Run =
+    { id : Int
+    , setup_file : String
+    , data_file : List String
+    , incubations : List Incubation
+    , standards : List Standard
+    , co2_calibration : Maybe Flux
+    , ch4_calibration : Maybe Flux
+    , n2o_calibration : Maybe Flux
+    }
+
+
 type alias Incubation =
     { injections : List Injection
     , standards : List Standard
@@ -287,6 +299,39 @@ standardResponseDecoder =
         |> required "data" standardDataDecoder
 
 
+runDecoder : Decoder Run
+runDecoder =
+    decode Run
+        |> required "id" JD.int
+        |> required "file" JD.string
+        |> hardcoded []
+        |> required "incubations" (JD.list incubationDecoder)
+        |> hardcoded []
+        |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
+        |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
+        |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
+
+
+runResponseDecoder : Decoder Run
+runResponseDecoder =
+    decode identity
+        |> required "data" runDecoder
+
+
+decodeRun : String -> Run
+decodeRun json =
+    case decodeString runResponseDecoder json of
+        Ok run ->
+            run
+
+        Err msg ->
+            let
+                _ =
+                    Debug.log "ERROR parsing run" msg
+            in
+                Run 0 "nothing" [] [] [] Nothing Nothing Nothing
+
+
 
 --- ENCODERS
 
@@ -320,12 +365,215 @@ incubationEncoder incubation =
 standardEncoder : Standard -> JE.Value
 standardEncoder standard =
     JE.object
-        [ ( "n2o_ppm", JE.float standard.n2o_ppm )
-        , ( "n2o_mv", JE.float standard.n2o_mv )
+        [ ( "id", JE.int standard.id )
         , ( "n2o_deleted", JE.bool standard.n2o_deleted )
+        , ( "co2_deleted", JE.bool standard.co2_deleted )
+        , ( "ch4_deleted", JE.bool standard.ch4_deleted )
         ]
 
 
 standardListEncoder : List Standard -> JE.Value
 standardListEncoder standardList =
     JE.object [ ( "standards", JE.list (List.map standardEncoder standardList) ) ]
+
+
+
+-- updaters
+
+
+updateN2OStandard : Standard -> Point -> Standard
+updateN2OStandard standard n2o =
+    if n2o.id == standard.id then
+        { standard | n2o_ppm = n2o.x, n2o_mv = n2o.y, n2o_deleted = n2o.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString n2o, " did not match any id in " ]
+
+            _ =
+                Debug.log msg standard
+        in
+            standard
+
+
+updateCO2Standard : Standard -> Point -> Standard
+updateCO2Standard standard co2 =
+    if co2.id == standard.id then
+        { standard | co2_ppm = co2.x, co2_mv = co2.y, co2_deleted = co2.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString co2, " did not match any id in " ]
+
+            _ =
+                Debug.log msg standard
+        in
+            standard
+
+
+updateCH4Standard : Standard -> Point -> Standard
+updateCH4Standard standard ch4 =
+    if ch4.id == standard.id then
+        { standard | ch4_ppm = ch4.x, ch4_mv = ch4.y, ch4_deleted = ch4.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString ch4, " did not match any id in " ]
+
+            _ =
+                Debug.log msg standard
+        in
+            standard
+
+
+updateN2OStandards : List Standard -> Point -> List Standard
+updateN2OStandards standards n2o =
+    let
+        ( standard, rest ) =
+            List.partition (\x -> x.id == n2o.id) standards
+
+        newStandard =
+            case (List.head standard) of
+                Just myStandard ->
+                    [ updateN2OStandard myStandard n2o ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newStandard
+
+
+updateCO2Standards : List Standard -> Point -> List Standard
+updateCO2Standards standards co2 =
+    let
+        ( standard, rest ) =
+            List.partition (\x -> x.id == co2.id) standards
+
+        newStandard =
+            case (List.head standard) of
+                Just myStandard ->
+                    [ updateCO2Standard myStandard co2 ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newStandard
+
+
+updateCH4Standards : List Standard -> Point -> List Standard
+updateCH4Standards standards ch4 =
+    let
+        ( standard, rest ) =
+            List.partition (\x -> x.id == ch4.id) standards
+
+        newStandard =
+            case (List.head standard) of
+                Just myStandard ->
+                    [ updateCH4Standard myStandard ch4 ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newStandard
+
+
+updateCO2Injection : Injection -> Point -> Injection
+updateCO2Injection injection co2 =
+    if co2.id == injection.id then
+        { injection | co2_ppm = co2.y, co2_deleted = co2.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString co2, " did not match any id in " ]
+
+            _ =
+                Debug.log msg injection
+        in
+            injection
+
+
+updateN2OInjection : Injection -> Point -> Injection
+updateN2OInjection injection n2o =
+    if n2o.id == injection.id then
+        { injection | n2o_ppm = n2o.y, n2o_deleted = n2o.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString n2o, " did not match any id in " ]
+
+            _ =
+                Debug.log msg injection
+        in
+            injection
+
+
+updateCH4Injection : Injection -> Point -> Injection
+updateCH4Injection injection ch4 =
+    if ch4.id == injection.id then
+        { injection | ch4_ppm = ch4.y, ch4_deleted = ch4.deleted }
+    else
+        let
+            -- TODO: Log this to the server side
+            msg =
+                String.concat [ "ERROR: ", toString ch4, " did not match any id in " ]
+
+            _ =
+                Debug.log msg injection
+        in
+            injection
+
+
+update_co2_injections : List Injection -> Point -> List Injection
+update_co2_injections injections co2 =
+    let
+        ( injection, rest ) =
+            List.partition (\x -> x.id == co2.id) injections
+
+        newInjection =
+            case (List.head injection) of
+                Just myInjection ->
+                    [ updateCO2Injection myInjection co2 ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newInjection
+
+
+update_ch4_injections : List Injection -> Point -> List Injection
+update_ch4_injections injections ch4 =
+    let
+        ( injection, rest ) =
+            List.partition (\x -> x.id == ch4.id) injections
+
+        newInjection =
+            case (List.head injection) of
+                Just myInjection ->
+                    [ updateCH4Injection myInjection ch4 ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newInjection
+
+
+update_n2o_injections : List Injection -> Point -> List Injection
+update_n2o_injections injections n2o =
+    let
+        ( injection, rest ) =
+            List.partition (\x -> x.id == n2o.id) injections
+
+        newInjection =
+            case (List.head injection) of
+                Just myInjection ->
+                    [ updateN2OInjection myInjection n2o ]
+
+                Nothing ->
+                    []
+    in
+        rest ++ newInjection
