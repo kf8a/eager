@@ -31,6 +31,7 @@ type alias Run =
 type alias Incubation =
     { injections : List Injection
     , id : Int
+    , status : Status
     , co2_flux : Maybe Flux
     , ch4_flux : Maybe Flux
     , n2o_flux : Maybe Flux
@@ -96,6 +97,7 @@ initialIncubation : Incubation
 initialIncubation =
     { injections = []
     , id = 0
+    , status = NotChecked
     , co2_flux = Nothing
     , ch4_flux = Nothing
     , n2o_flux = Nothing
@@ -189,6 +191,7 @@ incubationDecoder =
     decode Incubation
         |> required "injections" (JD.list injectionDecoder)
         |> required "id" JD.int
+        |> hardcoded NotChecked
         |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
