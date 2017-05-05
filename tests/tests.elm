@@ -176,18 +176,19 @@ all =
                         ((output >= 0) && (output <= 60))
                             |> Expect.true "Expected result be within extent range"
             ]
-        , describe "injection encoder"
-            [ test "it encodes an injection" <|
-                \() ->
-                    let
-                        result =
-                            injectionEncoder injection1
-                                |> encode 0
-                                |> decodeInjection
-                    in
-                        result
-                            |> Expect.equal injection1
-            ]
+
+        -- , describe "injection encoder"
+        --     [ test "it encodes an injection" <|
+        --         \() ->
+        --             let
+        --                 result =
+        --                     injectionEncoder injection1
+        --                         |> encode 0
+        --                         |> decodeInjection
+        --             in
+        --                 result
+        --                     |> Expect.equal injection1
+        --     ]
         , describe "injection decoder"
             [ test "it parses correct json" <|
                 \() ->

@@ -33,6 +33,7 @@ type Msg
     | FluxBad Incubation
     | LoadIncubation (Result Http.Error (List Injection))
     | LoadStandard (Result Http.Error (List Standard))
+    | LoadRun (Result Http.Error Run)
     | SaveStandards
     | SavedStandard (Result Http.Error String)
     | SavedIncubation (Result Http.Error Incubation)
@@ -51,26 +52,6 @@ initialModel =
     , next_run = Nothing
     , status = NotChecked
     }
-
-
-initialStandard : Standard
-initialStandard =
-    { n2o_ppm = 0.3
-    , n2o_mv = 100
-    , co2_ppm = 500
-    , co2_mv = 1000
-    , ch4_ppm = 2.0
-    , ch4_mv = 50.0
-    , n2o_deleted = False
-    , co2_deleted = False
-    , ch4_deleted = False
-    , id = 0
-    }
-
-
-initialStandards : List Standard
-initialStandards =
-    [ initialStandard ]
 
 
 
@@ -238,10 +219,6 @@ swapIncubation model =
             | next_incubation = model.incubation
             , incubation = inc
         }
-
-
-
--- VIEW
 
 
 x_offset : Float
@@ -496,6 +473,19 @@ renderList points =
         (List.map (\x -> renderListElement x) points)
 
 
+renderIncubation : Incubation -> Html Msg
+renderIncubation incubation =
+    let
+        _ =
+            Debug.log "n2o" (n2o_injections incubation.injections)
+    in
+        div []
+            [ draw_injections N2O (n2o_injections incubation.injections)
+            , draw_injections CO2 (co2_injections incubation.injections)
+            , draw_injections CH4 (ch4_injections incubation.injections)
+            ]
+
+
 view : Model -> Html Msg
 view model =
     div []
@@ -507,35 +497,44 @@ view model =
                 [ onClick SaveStandards ]
                 [ Html.text "Save" ]
             ]
-        , div []
-            [ draw_injections N2O (n2o_injections model.incubation.injections)
-            , draw_injections CO2 (co2_injections model.incubation.injections)
-            , draw_injections CH4 (ch4_injections model.incubation.injections)
-            ]
+        , div [] (List.map renderIncubation model.run.incubations)
         , button
             [ onClick (FluxGood model.incubation) ]
-            [ Html.text "Good" ]
+            [ Html.text "Save" ]
         , button
             [ onClick (FluxMaybeGood model.incubation) ]
-            [ Html.text "Maybe" ]
-        , button
-            [ onClick (FluxBad model.incubation) ]
-            [ Html.text "Bad" ]
+            [ Html.text "Cancel" ]
         ]
 
 
 
--- update
+-- UPDATE
+
+
+base_url : String
+base_url =
+    "http://localhost:4000/api/"
 
 
 url : String
 url =
-    "http://localhost:4000/api/injections?incubation_id=35191"
+    base_url ++ "injections?incubation_id=35191"
 
 
 standardUrl : String
 standardUrl =
-    "http://localhost:4000/api/standard_curves/1"
+    base_url ++ "standard_curves/1"
+
+
+runUrl : String
+runUrl =
+    base_url ++ "runs/1"
+
+
+fetchRun : String -> Cmd Msg
+fetchRun url =
+    Http.get url runResponseDecoder
+        |> Http.send LoadRun
 
 
 fetchStandard : Cmd Msg
@@ -752,6 +751,16 @@ update msg model =
             in
                 ( { model | incubation = newIncubation }, Cmd.none )
 
+        LoadRun (Ok run) ->
+            ( { model | run = run }, Cmd.none )
+
+        LoadRun (Err msg) ->
+            let
+                _ =
+                    Debug.log "Error" msg
+            in
+                ( model, Cmd.none )
+
         SaveStandards ->
             ( model, saveStandardList model.incubation.standards )
 
@@ -768,4 +777,4 @@ update msg model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel, fetchStandard )
+    ( initialModel, fetchRun runUrl )

@@ -114,6 +114,26 @@ initialRun =
     Run 0 "nothing" [] [] [] Nothing Nothing Nothing
 
 
+initialStandard : Standard
+initialStandard =
+    { n2o_ppm = 0.3
+    , n2o_mv = 100
+    , co2_ppm = 500
+    , co2_mv = 1000
+    , ch4_ppm = 2.0
+    , ch4_mv = 50.0
+    , n2o_deleted = False
+    , co2_deleted = False
+    , ch4_deleted = False
+    , id = 0
+    }
+
+
+initialStandards : List Standard
+initialStandards =
+    [ initialStandard ]
+
+
 sortedRecords : Injection -> Injection -> Order
 sortedRecords a b =
     DE.compare a.datetime b.datetime
