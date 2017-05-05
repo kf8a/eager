@@ -32,10 +32,7 @@ type Msg
     | FluxMaybeGood Incubation
     | FluxBad Incubation
     | LoadIncubation (Result Http.Error (List Injection))
-    | LoadStandard (Result Http.Error (List Standard))
     | LoadRun (Result Http.Error Run)
-    | SaveStandards
-    | SavedStandard (Result Http.Error String)
     | SavedIncubation (Result Http.Error Incubation)
     | NoOp
 
@@ -130,6 +127,21 @@ fluxWithDefault fit =
             Flux 0 0 0
 
 
+calibrateIncubationCO2 : Incubation -> Incubation
+calibrateIncubationCO2 incubation =
+    incubation
+
+
+calibrateRunCO2 : Run -> Run
+calibrateRunCO2 run =
+    let
+        newIncubationList =
+            run.incubations
+                |> List.map calibrateIncubationCO2
+    in
+        { run | incubations = newIncubationList }
+
+
 
 -- Translators
 
@@ -148,7 +160,6 @@ toIncubation injections standards =
     in
         Incubation
             injections
-            initialStandards
             1
             (Just co2s)
             (Just ch4s)
@@ -494,9 +505,6 @@ view model =
             [ draw_standards N2O (n2o_standards model.run.standards)
             , draw_standards CO2 (co2_standards model.run.standards)
             , draw_standards CH4 (ch4_standards model.run.standards)
-            , button
-                [ onClick SaveStandards ]
-                [ Html.text "Save" ]
             ]
         , div []
             (model.run.incubations
@@ -540,12 +548,6 @@ fetchRun : String -> Cmd Msg
 fetchRun url =
     Http.get url runResponseDecoder
         |> Http.send LoadRun
-
-
-fetchStandard : Cmd Msg
-fetchStandard =
-    Http.get standardUrl standardResponseDecoder
-        |> Http.send LoadStandard
 
 
 fetchNextIncubation : Cmd Msg
@@ -609,19 +611,20 @@ updateRunStandard run updater point =
         new_run
 
 
-updateStandard : Incubation -> (List Standard -> Point -> List Standard) -> Point -> Incubation
-updateStandard incubation updater point =
-    let
-        new_point =
-            { point | deleted = not point.deleted }
 
-        new_standards =
-            updater incubation.standards new_point
-
-        new_incubation =
-            { incubation | standards = new_standards }
-    in
-        new_incubation
+-- updateStandard : Incubation -> (List Standard -> Point -> List Standard) -> Point -> Incubation
+-- updateStandard incubation updater point =
+--     let
+--         new_point =
+--             { point | deleted = not point.deleted }
+--
+--         new_standards =
+--             updater incubation.standards new_point
+--
+--         new_incubation =
+--             { incubation | standards = new_standards }
+--     in
+--         new_incubation
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -790,23 +793,6 @@ update msg model =
             in
                 ( model, Cmd.none )
 
-        LoadStandard (Err message) ->
-            let
-                _ =
-                    Debug.log "Error" message
-            in
-                ( model, Cmd.none )
-
-        LoadStandard (Ok standards) ->
-            let
-                incubation =
-                    model.incubation
-
-                newIncubation =
-                    { incubation | standards = standards }
-            in
-                ( { model | incubation = newIncubation }, Cmd.none )
-
         LoadRun (Ok run) ->
             ( { model | run = run }, Cmd.none )
 
@@ -816,16 +802,6 @@ update msg model =
                     Debug.log "Error" msg
             in
                 ( model, Cmd.none )
-
-        SaveStandards ->
-            ( model, saveStandardList model.incubation.standards )
-
-        SavedStandard (Ok _) ->
-            ( model, Cmd.none )
-
-        SavedStandard (Err msg) ->
-            --TODO handle error when saving
-            ( model, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
