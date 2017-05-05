@@ -524,7 +524,7 @@ standardUrl =
 
 runUrl : String
 runUrl =
-    base_url ++ "runs/1"
+    base_url ++ "runs/2"
 
 
 fetchRun : String -> Cmd Msg
@@ -583,6 +583,21 @@ updateIncubation incubation updater point =
 
 
 --- todo  move flux updating here by passing in the extractor
+
+
+updateRunStandard : Run -> (List Standard -> Point -> List Standard) -> Point -> Run
+updateRunStandard run updater point =
+    let
+        new_point =
+            { point | deleted = not point.deleted }
+
+        new_standards =
+            updater run.standards new_point
+
+        new_run =
+            { run | standards = new_standards }
+    in
+        new_run
 
 
 updateStandard : Incubation -> (List Standard -> Point -> List Standard) -> Point -> Incubation
@@ -644,42 +659,42 @@ update msg model =
 
         SwitchStandard CO2 point ->
             let
-                updatedIncubation =
-                    updateStandard model.incubation (updateCO2Standards) point
+                updatedRun =
+                    updateRunStandard model.run (updateCO2Standards) point
 
                 new_flux =
-                    toFit (co2_standards updatedIncubation.standards)
+                    toFit (co2_standards updatedRun.standards)
 
-                newIncubation =
-                    { updatedIncubation | co2_calibration = Just new_flux }
+                newRun =
+                    { updatedRun | co2_calibration = Just new_flux }
             in
-                ( { model | incubation = newIncubation }, Cmd.none )
+                ( { model | run = newRun }, Cmd.none )
 
         SwitchStandard CH4 point ->
             let
-                updatedIncubation =
-                    updateStandard model.incubation (updateCH4Standards) point
+                updatedRun =
+                    updateRunStandard model.run (updateCH4Standards) point
 
                 new_flux =
-                    toFit (ch4_standards updatedIncubation.standards)
+                    toFit (ch4_standards updatedRun.standards)
 
-                newIncubation =
-                    { updatedIncubation | ch4_calibration = Just new_flux }
+                newRun =
+                    { updatedRun | ch4_calibration = Just new_flux }
             in
-                ( { model | incubation = newIncubation }, Cmd.none )
+                ( { model | run = newRun }, Cmd.none )
 
         SwitchStandard N2O point ->
             let
-                updatedIncubation =
-                    updateStandard model.incubation (updateN2OStandards) point
+                updatedRun =
+                    updateRunStandard model.run (updateN2OStandards) point
 
                 new_flux =
-                    toFit (n2o_standards updatedIncubation.standards)
+                    toFit (n2o_standards updatedRun.standards)
 
-                newIncubation =
-                    { updatedIncubation | n2o_calibration = Just new_flux }
+                newRun =
+                    { updatedRun | n2o_calibration = Just new_flux }
             in
-                ( { model | incubation = newIncubation }, Cmd.none )
+                ( { model | run = newRun }, Cmd.none )
 
         FluxGood incubation ->
             let
