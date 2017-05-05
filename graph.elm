@@ -26,7 +26,7 @@ type Gas
 
 
 type Msg
-    = SwitchInjection Gas Point
+    = SwitchInjection Gas Incubation Point
     | SwitchStandard Gas Point
     | FluxGood Incubation
     | FluxMaybeGood Incubation
@@ -318,8 +318,8 @@ draw_standards gas points =
         draw_graph my_dots (toString gas) points flux
 
 
-draw_injections : Gas -> List Point -> Svg Msg
-draw_injections gas points =
+draw_injections : Gas -> Incubation -> List Point -> Svg Msg
+draw_injections gas incubation points =
     let
         fit =
             fitLineByLeastSquares points
@@ -328,7 +328,7 @@ draw_injections gas points =
             fluxWithDefault fit
 
         my_dots =
-            injectionDots gas points
+            injectionDots gas incubation points
     in
         draw_graph my_dots (toString gas) points flux
 
@@ -445,13 +445,13 @@ standardDots gas points =
         List.map (\x -> dotTransform (SwitchStandard gas x) x) points
 
 
-injectionDots : Gas -> List Point -> List (Svg Msg)
-injectionDots gas points =
+injectionDots : Gas -> Incubation -> List Point -> List (Svg Msg)
+injectionDots gas incubation points =
     let
         dotTransform =
             dot (toXAxis points) (toYAxis points)
     in
-        List.map (\x -> dotTransform (SwitchInjection gas x) x) points
+        List.map (\x -> dotTransform (SwitchInjection gas incubation x) x) points
 
 
 renderListElement : Point -> Html Msg
@@ -476,10 +476,15 @@ renderList points =
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
     div []
-        [ draw_injections N2O (n2o_injections incubation.injections)
-        , draw_injections CO2 (co2_injections incubation.injections)
-        , draw_injections CH4 (ch4_injections incubation.injections)
+        [ draw_injections N2O incubation (n2o_injections incubation.injections)
+        , draw_injections CO2 incubation (co2_injections incubation.injections)
+        , draw_injections CH4 incubation (ch4_injections incubation.injections)
         ]
+
+
+orderedIncubation : Incubation -> Incubation -> Order
+orderedIncubation a b =
+    Basics.compare a.id b.id
 
 
 view : Model -> Html Msg
@@ -493,7 +498,11 @@ view model =
                 [ onClick SaveStandards ]
                 [ Html.text "Save" ]
             ]
-        , div [] (List.map renderIncubation model.run.incubations)
+        , div []
+            (model.run.incubations
+                |> List.sortWith orderedIncubation
+                |> List.map renderIncubation
+            )
         , button
             [ onClick (FluxGood model.incubation) ]
             [ Html.text "Save" ]
@@ -618,44 +627,80 @@ updateStandard incubation updater point =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SwitchInjection CO2 point ->
+        SwitchInjection CO2 incubation point ->
             let
                 updated_incubation =
-                    updateIncubation model.incubation (update_co2_injections) point
+                    updateIncubation incubation (update_co2_injections) point
 
                 new_flux =
                     toFit (co2_injections updated_incubation.injections)
 
-                new_incubation =
+                newIncubation =
                     { updated_incubation | co2_flux = Just new_flux }
-            in
-                ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchInjection CH4 point ->
+                ( oldIncubation, rest ) =
+                    List.partition (\x -> x.id == incubation.id) model.run.incubations
+
+                newIncubationList =
+                    List.concat [ rest, [ newIncubation ] ]
+
+                run =
+                    model.run
+
+                newRun =
+                    { run | incubations = newIncubationList }
+            in
+                ( { model | run = newRun }, Cmd.none )
+
+        SwitchInjection CH4 incubation point ->
             let
                 updated_incubation =
-                    updateIncubation model.incubation (update_ch4_injections) point
+                    updateIncubation incubation (update_ch4_injections) point
 
                 new_flux =
                     toFit (ch4_injections updated_incubation.injections)
 
-                new_incubation =
+                newIncubation =
                     { updated_incubation | ch4_flux = Just new_flux }
-            in
-                ( { model | incubation = new_incubation }, Cmd.none )
 
-        SwitchInjection N2O point ->
+                ( oldIncubation, rest ) =
+                    List.partition (\x -> x.id == incubation.id) model.run.incubations
+
+                newIncubationList =
+                    List.concat [ rest, [ newIncubation ] ]
+
+                run =
+                    model.run
+
+                newRun =
+                    { run | incubations = newIncubationList }
+            in
+                ( { model | run = newRun }, Cmd.none )
+
+        SwitchInjection N2O incubation point ->
             let
                 updated_incubation =
-                    updateIncubation model.incubation (update_n2o_injections) point
+                    updateIncubation incubation (update_n2o_injections) point
 
                 new_flux =
                     toFit (n2o_injections updated_incubation.injections)
 
-                new_incubation =
+                newIncubation =
                     { updated_incubation | n2o_flux = Just new_flux }
+
+                ( oldIncubation, rest ) =
+                    List.partition (\x -> x.id == incubation.id) model.run.incubations
+
+                newIncubationList =
+                    List.concat [ rest, [ newIncubation ] ]
+
+                run =
+                    model.run
+
+                newRun =
+                    { run | incubations = newIncubationList }
             in
-                ( { model | incubation = new_incubation }, Cmd.none )
+                ( { model | run = newRun }, Cmd.none )
 
         SwitchStandard CO2 point ->
             let
