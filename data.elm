@@ -34,9 +34,6 @@ type alias Incubation =
     , co2_flux : Maybe Flux
     , ch4_flux : Maybe Flux
     , n2o_flux : Maybe Flux
-    , co2_calibration : Maybe Flux
-    , ch4_calibration : Maybe Flux
-    , n2o_calibration : Maybe Flux
     }
 
 
@@ -102,9 +99,6 @@ initialIncubation =
     , co2_flux = Nothing
     , ch4_flux = Nothing
     , n2o_flux = Nothing
-    , co2_calibration = Nothing
-    , ch4_calibration = Nothing
-    , n2o_calibration = Nothing
     }
 
 
@@ -198,9 +192,6 @@ incubationDecoder =
         |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
-        |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
-        |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
-        |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
 
 
 responseIncubationDecoder : Decoder Incubation
@@ -383,16 +374,44 @@ injectionEncoder injection =
         , ( "id", JE.int injection.id )
         , ( "co2_deleted", JE.bool injection.co2_deleted )
         , ( "n2o_deleted", JE.bool injection.n2o_deleted )
-        , ( "co2_deleted", JE.bool injection.co2_deleted )
+        , ( "ch4_deleted", JE.bool injection.co2_deleted )
         ]
 
 
 incubationEncoder : Incubation -> JE.Value
 incubationEncoder incubation =
-    JE.object
-        [ ( "injections", JE.list (List.map injectionEncoder incubation.injections) )
-        , ( "id", JE.int incubation.id )
-        ]
+    let
+        n2o_flux =
+            case incubation.n2o_flux of
+                Just flux ->
+                    JE.float flux.slope
+
+                Nothing ->
+                    JE.null
+
+        co2_flux =
+            case incubation.co2_flux of
+                Just flux ->
+                    JE.float flux.slope
+
+                Nothing ->
+                    JE.null
+
+        ch4_flux =
+            case incubation.ch4_flux of
+                Just flux ->
+                    JE.float flux.slope
+
+                Nothing ->
+                    JE.null
+    in
+        JE.object
+            [ ( "injections", JE.list (List.map injectionEncoder incubation.injections) )
+            , ( "id", JE.int incubation.id )
+            , ( "n2o_flux", n2o_flux )
+            , ( "co2_flux", co2_flux )
+            , ( "ch4_flux", ch4_flux )
+            ]
 
 
 standardEncoder : Standard -> JE.Value
@@ -408,6 +427,15 @@ standardEncoder standard =
 standardListEncoder : List Standard -> JE.Value
 standardListEncoder standardList =
     JE.object [ ( "standards", JE.list (List.map standardEncoder standardList) ) ]
+
+
+runEncoder : Run -> JE.Value
+runEncoder run =
+    JE.object
+        [ ( "incubations", JE.list (List.map incubationEncoder run.incubations) )
+        , ( "standards", JE.list (List.map standardEncoder run.standards) )
+        , ( "id", JE.int run.id )
+        ]
 
 
 

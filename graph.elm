@@ -31,10 +31,12 @@ type Gas
 type Msg
     = SwitchInjection Gas Incubation Point
     | SwitchStandard Gas Point
+    | LoadRun (Result Http.Error Run)
+    | RunSaved (Result Http.Error Run)
+    | SaveRun
       -- | FluxGood Incubation
       -- | FluxMaybeGood Incubation
       -- | FluxBad Incubation
-    | LoadRun (Result Http.Error Run)
       -- | SavedIncubation (Result Http.Error Incubation)
     | NoOp
 
@@ -607,7 +609,9 @@ orderedIncubation a b =
 view : Model -> Html Msg
 view model =
     div []
-        [ div []
+        [ button [ onClick SaveRun ]
+            [ Html.text "Save" ]
+        , div []
             [ draw_standards N2O (n2o_standards model.run.standards)
             , draw_standards CO2 (co2_standards model.run.standards)
             , draw_standards CH4 (ch4_standards model.run.standards)
@@ -647,12 +651,25 @@ fetchRun url =
         |> Http.send LoadRun
 
 
+runSaved : Result Http.Error () -> Msg
+runSaved result =
+    case result of
+        Ok _ ->
+            NoOp
 
--- saveStandardList : List Standard -> Cmd Msg
--- saveStandardList standardList =
---     HttpBuilder.post "http://localhost:4000/api/standards"
---         |> withJsonBody (standardListEncoder standardList)
---         |> send standardSaved
+        Err msg ->
+            let
+                _ =
+                    Debug.log "ERROR" msg
+            in
+                NoOp
+
+
+saveRun : Run -> Cmd Msg
+saveRun run =
+    HttpBuilder.post "http://localhost:4000/api/runs "
+        |> withJsonBody (runEncoder run)
+        |> send runSaved
 
 
 updateIncubation : Incubation -> (List Injection -> Point -> List Injection) -> Point -> Incubation
@@ -806,6 +823,15 @@ update msg model =
         --     in
         --         --- TODO: need to alert the user that something failed
         --         ( model, Cmd.none )
+        RunSaved (Ok run) ->
+            ( model, Cmd.none )
+
+        RunSaved (Err msg) ->
+            ( model, Cmd.none )
+
+        SaveRun ->
+            ( model, saveRun model.run )
+
         LoadRun (Ok run) ->
             let
                 co2_cal =
