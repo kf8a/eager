@@ -151,17 +151,17 @@ sortedRecords a b =
 
 co2_standards : List Standard -> List Point
 co2_standards standards =
-    List.map (\x -> Point x.co2_ppm x.co2_mv x.co2_deleted x.id) standards
+    List.map (\x -> Point x.co2_mv x.co2_ppm x.co2_deleted x.id) standards
 
 
 n2o_standards : List Standard -> List Point
 n2o_standards standards =
-    List.map (\x -> Point x.n2o_ppm x.n2o_mv x.n2o_deleted x.id) standards
+    List.map (\x -> Point x.n2o_mv x.n2o_ppm x.n2o_deleted x.id) standards
 
 
 ch4_standards : List Standard -> List Point
 ch4_standards standards =
-    List.map (\x -> Point x.ch4_ppm x.ch4_mv x.ch4_deleted x.id) standards
+    List.map (\x -> Point x.ch4_mv x.ch4_ppm x.ch4_deleted x.id) standards
         |> List.filter (\x -> x.y /= 0.0)
 
 

@@ -127,6 +127,28 @@ fluxWithDefault fit =
             Flux 0 0 0
 
 
+
+--- Calibration
+
+
+calibrateInjectionN2O : Flux -> Injection -> Injection
+calibrateInjectionN2O calibration injection =
+    let
+        n2o_ppm =
+            calibration.intercept + calibration.slope * injection.n2o_mv
+    in
+        { injection | n2o_ppm = n2o_ppm }
+
+
+calibrateInjectionCH4 : Flux -> Injection -> Injection
+calibrateInjectionCH4 calibration injection =
+    let
+        ch4_ppm =
+            calibration.intercept + calibration.slope * injection.ch4_mv
+    in
+        { injection | ch4_ppm = ch4_ppm }
+
+
 calibrateInjectionCO2 : Flux -> Injection -> Injection
 calibrateInjectionCO2 calibration injection =
     let
@@ -134,6 +156,26 @@ calibrateInjectionCO2 calibration injection =
             calibration.intercept + calibration.slope * injection.co2_mv
     in
         { injection | co2_ppm = co2_ppm }
+
+
+calibrateIncubationN2O : Flux -> Incubation -> Incubation
+calibrateIncubationN2O calibration incubation =
+    let
+        injections =
+            incubation.injections
+                |> List.map (calibrateInjectionN2O calibration)
+    in
+        { incubation | injections = injections }
+
+
+calibrateIncubationCH4 : Flux -> Incubation -> Incubation
+calibrateIncubationCH4 calibration incubation =
+    let
+        injections =
+            incubation.injections
+                |> List.map (calibrateInjectionCH4 calibration)
+    in
+        { incubation | injections = injections }
 
 
 calibrateIncubationCO2 : Flux -> Incubation -> Incubation
@@ -144,6 +186,36 @@ calibrateIncubationCO2 calibration incubation =
                 |> List.map (calibrateInjectionCO2 calibration)
     in
         { incubation | injections = injections }
+
+
+calibrateRunN2O : Run -> Run
+calibrateRunN2O run =
+    case run.n2o_calibration of
+        Just calibration ->
+            let
+                newIncubationList =
+                    run.incubations
+                        |> List.map (calibrateIncubationN2O calibration)
+            in
+                { run | incubations = newIncubationList }
+
+        Nothing ->
+            run
+
+
+calibrateRunCH4 : Run -> Run
+calibrateRunCH4 run =
+    case run.ch4_calibration of
+        Just calibration ->
+            let
+                newIncubationList =
+                    run.incubations
+                        |> List.map (calibrateIncubationCH4 calibration)
+            in
+                { run | incubations = newIncubationList }
+
+        Nothing ->
+            run
 
 
 calibrateRunCO2 : Run -> Run
@@ -159,6 +231,51 @@ calibrateRunCO2 run =
 
         Nothing ->
             run
+
+
+computeCalibrationN2O : List Standard -> Flux
+computeCalibrationN2O standards =
+    toFit (ch4_standards standards)
+
+
+computeCalibrationCH4 : List Standard -> Flux
+computeCalibrationCH4 standards =
+    toFit (ch4_standards standards)
+
+
+computeCalibrationCO2 : List Standard -> Flux
+computeCalibrationCO2 standards =
+    toFit (co2_standards standards)
+
+
+updateCalibrationN2O : Run -> Point -> Run
+updateCalibrationN2O run point =
+    let
+        updatedRun =
+            updateRunStandard run (updateN2OStandards) point
+    in
+        { updatedRun | n2o_calibration = Just (computeCalibrationN2O updatedRun.standards) }
+            |> calibrateRunN2O
+
+
+updateCalibrationCH4 : Run -> Point -> Run
+updateCalibrationCH4 run point =
+    let
+        updatedRun =
+            updateRunStandard run (updateCH4Standards) point
+    in
+        { updatedRun | ch4_calibration = Just (computeCalibrationCH4 updatedRun.standards) }
+            |> calibrateRunCH4
+
+
+updateCalibrationCO2 : Run -> Point -> Run
+updateCalibrationCO2 run point =
+    let
+        updatedRun =
+            updateRunStandard run (updateCO2Standards) point
+    in
+        { updatedRun | co2_calibration = Just (computeCalibrationCO2 updatedRun.standards) }
+            |> calibrateRunCO2
 
 
 
@@ -709,44 +826,13 @@ update msg model =
                 ( { model | run = newRun }, Cmd.none )
 
         SwitchStandard CO2 point ->
-            let
-                updatedRun =
-                    updateRunStandard model.run (updateCO2Standards) point
-
-                new_flux =
-                    toFit (co2_standards updatedRun.standards)
-
-                newRun =
-                    { updatedRun | co2_calibration = Just new_flux }
-                        |> calibrateRunCO2
-            in
-                ( { model | run = newRun }, Cmd.none )
+            ( { model | run = updateCalibrationCO2 model.run point }, Cmd.none )
 
         SwitchStandard CH4 point ->
-            let
-                updatedRun =
-                    updateRunStandard model.run (updateCH4Standards) point
-
-                new_flux =
-                    toFit (ch4_standards updatedRun.standards)
-
-                newRun =
-                    { updatedRun | ch4_calibration = Just new_flux }
-            in
-                ( { model | run = newRun }, Cmd.none )
+            ( { model | run = updateCalibrationCH4 model.run point }, Cmd.none )
 
         SwitchStandard N2O point ->
-            let
-                updatedRun =
-                    updateRunStandard model.run (updateN2OStandards) point
-
-                new_flux =
-                    toFit (n2o_standards updatedRun.standards)
-
-                newRun =
-                    { updatedRun | n2o_calibration = Just new_flux }
-            in
-                ( { model | run = newRun }, Cmd.none )
+            ( { model | run = updateCalibrationN2O model.run point }, Cmd.none )
 
         FluxGood incubation ->
             let
@@ -798,8 +884,27 @@ update msg model =
                 ( model, Cmd.none )
 
         LoadRun (Ok run) ->
-            -- TODO: Compute calibration on load
-            ( { model | run = run }, Cmd.none )
+            let
+                co2_cal =
+                    computeCalibrationCO2 run.standards
+
+                ch4_cal =
+                    computeCalibrationCH4 run.standards
+
+                n2o_cal =
+                    computeCalibrationN2O run.standards
+
+                newRun =
+                    { run
+                        | co2_calibration = Just co2_cal
+                        , ch4_calibration = Just ch4_cal
+                        , n2o_calibration = Just n2o_cal
+                    }
+                        |> calibrateRunCO2
+                        |> calibrateRunCH4
+                        |> calibrateRunN2O
+            in
+                ( { model | run = newRun }, Cmd.none )
 
         LoadRun (Err msg) ->
             let
