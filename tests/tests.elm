@@ -49,15 +49,15 @@ all =
             [ test "extract co2 point list" <|
                 \() ->
                     co2_standards [ standard1, standard2 ]
-                        |> Expect.equal [ (Point 3 4 False 1), (Point 3 4 False 2) ]
+                        |> Expect.equal [ (Point 4 3 False 1), (Point 4 3 False 2) ]
             , test "extract n2o point list" <|
                 \() ->
                     n2o_standards [ standard1, standard2 ]
-                        |> Expect.equal [ (Point 1 2 False 1), (Point 1 2 False 2) ]
+                        |> Expect.equal [ (Point 2 1 False 1), (Point 2 1 False 2) ]
             , test "extract ch4 point list" <|
                 \() ->
                     ch4_standards [ standard1, standard2 ]
-                        |> Expect.equal [ (Point 5 6 False 1), (Point 5 6 False 2) ]
+                        |> Expect.equal [ (Point 6 5 False 1), (Point 6 5 False 2) ]
             ]
         , describe "transform from incubation to standard"
             [ test "update standard from point with matching id" <|

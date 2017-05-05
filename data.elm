@@ -63,9 +63,7 @@ type alias Axis =
 
 
 type alias Model =
-    { incubation : Incubation
-    , next_incubation : Incubation
-    , run : Run
+    { run : Run
     , next_run : Maybe Run
     , status : Status
     }

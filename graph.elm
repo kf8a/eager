@@ -15,7 +15,10 @@ import Http
 import HttpBuilder exposing (..)
 import LeastSquares exposing (..)
 import Round exposing (..)
-import SampleIncubation exposing (json, nextJson)
+
+
+-- import SampleIncubation exposing (json, nextJson)
+
 import Data exposing (..)
 
 
@@ -28,24 +31,17 @@ type Gas
 type Msg
     = SwitchInjection Gas Incubation Point
     | SwitchStandard Gas Point
-    | FluxGood Incubation
-    | FluxMaybeGood Incubation
-    | FluxBad Incubation
-    | LoadIncubation (Result Http.Error (List Injection))
+      -- | FluxGood Incubation
+      -- | FluxMaybeGood Incubation
+      -- | FluxBad Incubation
     | LoadRun (Result Http.Error Run)
-    | SavedIncubation (Result Http.Error Incubation)
+      -- | SavedIncubation (Result Http.Error Incubation)
     | NoOp
 
 
 initialModel : Model
 initialModel =
-    { incubation =
-        toIncubation (decodeInjections SampleIncubation.json)
-            initialStandards
-    , next_incubation =
-        toIncubation (decodeInjections SampleIncubation.nextJson)
-            initialStandards
-    , run = initialRun
+    { run = initialRun
     , next_run = Nothing
     , status = NotChecked
     }
@@ -356,16 +352,17 @@ update_point point incubation =
         old_list ++ [ new_point ]
 
 
-swapIncubation : Model -> Model
-swapIncubation model =
-    let
-        inc =
-            model.next_incubation
-    in
-        { model
-            | next_incubation = model.incubation
-            , incubation = inc
-        }
+
+-- swapIncubation : Model -> Model
+-- swapIncubation model =
+--     let
+--         inc =
+--             model.next_incubation
+--     in
+--         { model
+--             | next_incubation = model.incubation
+--             , incubation = inc
+--         }
 
 
 x_offset : Float
@@ -647,12 +644,13 @@ view model =
                 |> List.sortWith orderedIncubation
                 |> List.map renderIncubation
             )
-        , button
-            [ onClick (FluxGood model.incubation) ]
-            [ Html.text "Save" ]
-        , button
-            [ onClick (FluxMaybeGood model.incubation) ]
-            [ Html.text "Cancel" ]
+
+        -- , button
+        --     [ onClick (FluxGood model.incubation) ]
+        --     [ Html.text "Save" ]
+        -- , button
+        --     [ onClick (FluxMaybeGood model.incubation) ]
+        --     [ Html.text "Cancel" ]
         ]
 
 
@@ -684,12 +682,6 @@ fetchRun : String -> Cmd Msg
 fetchRun url =
     Http.get url runResponseDecoder
         |> Http.send LoadRun
-
-
-fetchNextIncubation : Cmd Msg
-fetchNextIncubation =
-    Http.get url responseDecoder
-        |> Http.send LoadIncubation
 
 
 standardSaved : Result Http.Error () -> Msg
@@ -834,55 +826,36 @@ update msg model =
         SwitchStandard N2O point ->
             ( { model | run = updateCalibrationN2O model.run point }, Cmd.none )
 
-        FluxGood incubation ->
-            let
-                new_model =
-                    swapIncubation model
-            in
-                ( { new_model | status = Good }, fetchNextIncubation )
-
-        FluxMaybeGood incubation ->
-            let
-                new_model =
-                    swapIncubation model
-            in
-                ( { new_model | status = MaybeGood }, fetchNextIncubation )
-
-        FluxBad incubation ->
-            let
-                new_model =
-                    swapIncubation model
-            in
-                ( { new_model | status = Bad }, fetchNextIncubation )
-
-        SavedIncubation (Ok incubation) ->
-            ( model, fetchNextIncubation )
-
-        SavedIncubation (Err msg) ->
-            let
-                _ =
-                    Debug.log "error Saving" msg
-            in
-                --- TODO: need to alert the user that something failed
-                ( model, Cmd.none )
-
-        LoadIncubation (Ok injections) ->
-            let
-                _ =
-                    Debug.log "ok incubation" injections
-
-                newModel =
-                    { model | next_incubation = (toIncubation injections initialStandards) }
-            in
-                ( newModel, Cmd.none )
-
-        LoadIncubation (Err message) ->
-            let
-                _ =
-                    Debug.log "Error" message
-            in
-                ( model, Cmd.none )
-
+        -- FluxGood incubation ->
+        --     let
+        --         new_model =
+        --             swapIncubation model
+        --     in
+        --         ( { new_model | status = Good }, fetchNextIncubation )
+        --
+        -- FluxMaybeGood incubation ->
+        --     let
+        --         new_model =
+        --             swapIncubation model
+        --     in
+        --         ( { new_model | status = MaybeGood }, fetchNextIncubation )
+        --
+        -- FluxBad incubation ->
+        --     let
+        --         new_model =
+        --             swapIncubation model
+        --     in
+        --         ( { new_model | status = Bad }, fetchNextIncubation )
+        -- SavedIncubation (Ok incubation) ->
+        --     ( model, fetchNextIncubation )
+        --
+        -- SavedIncubation (Err msg) ->
+        --     let
+        --         _ =
+        --             Debug.log "error Saving" msg
+        --     in
+        --         --- TODO: need to alert the user that something failed
+        --         ( model, Cmd.none )
         LoadRun (Ok run) ->
             let
                 co2_cal =
