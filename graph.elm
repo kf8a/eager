@@ -277,6 +277,56 @@ updateCalibrationCO2 run point =
 
 
 
+--- Compute Fluxes
+
+
+computeFlux : List Point -> Flux
+computeFlux points =
+    points
+        |> fitLineByLeastSquares
+        |> fluxWithDefault
+
+
+computeCO2Flux : Incubation -> Flux
+computeCO2Flux incubation =
+    incubation.injections
+        |> co2_injections
+        |> computeFlux
+
+
+computeCH4Flux : Incubation -> Flux
+computeCH4Flux incubation =
+    incubation.injections
+        |> ch4_injections
+        |> computeFlux
+
+
+computeIncubationFluxes : Incubation -> Incubation
+computeIncubationFluxes incubation =
+    let
+        n2o_flux =
+            incubation.injections
+                |> n2o_injections
+                |> computeFlux
+
+        co2_flux =
+            incubation.injections
+                |> co2_injections
+                |> computeFlux
+
+        ch4_flux =
+            incubation.injections
+                |> ch4_injections
+                |> computeFlux
+    in
+        { incubation
+            | n2o_flux = Just n2o_flux
+            , ch4_flux = Just ch4_flux
+            , co2_flux = Just co2_flux
+        }
+
+
+
 --- VIEW
 
 
@@ -425,11 +475,8 @@ drawRegressionLine xAxis yAxis flux =
 draw_standards : Gas -> List Point -> Svg Msg
 draw_standards gas points =
     let
-        fit =
-            fitLineByLeastSquares points
-
         flux =
-            fluxWithDefault fit
+            computeFlux points
 
         my_dots =
             standardDots gas points
@@ -440,11 +487,8 @@ draw_standards gas points =
 draw_injections : Gas -> Incubation -> List Point -> Svg Msg
 draw_injections gas incubation points =
     let
-        fit =
-            fitLineByLeastSquares points
-
         flux =
-            fluxWithDefault fit
+            computeFlux points
 
         my_dots =
             injectionDots gas incubation points
@@ -852,8 +896,11 @@ update msg model =
                         |> calibrateRunCO2
                         |> calibrateRunCH4
                         |> calibrateRunN2O
+
+                updatedRun =
+                    { run | incubations = List.map computeIncubationFluxes newRun.incubations }
             in
-                ( { model | run = newRun }, Cmd.none )
+                ( { model | run = updatedRun }, Cmd.none )
 
         LoadRun (Err msg) ->
             let
