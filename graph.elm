@@ -394,9 +394,7 @@ draw_graph drawing_func label points flux =
             -- , viewBox (viewBox_ xAxis yAxis)
             ]
             [ g [ transform translateCoords ]
-                [ g []
-                    drawing_func
-                , g [] [ (drawRegressionLine xAxis yAxis flux) ]
+                [ g [] [ (drawRegressionLine xAxis yAxis flux) ]
                 , g []
                     [ drawXAxis xAxis yAxis
                     , drawYAxis xAxis yAxis
@@ -406,6 +404,8 @@ draw_graph drawing_func label points flux =
                     , text_ [ x "10", y "40" ] [ Svg.text eq ]
                     , text_ [ x "10", y "60" ] [ Svg.text r ]
                     ]
+                , g []
+                    drawing_func
                 ]
             ]
 
@@ -445,7 +445,7 @@ dot xAxis yAxis msg point =
                         ]
                         []
                     , circle
-                        [ cx (toString (xAxis.max_extent))
+                        [ cx (toString (xAxis.max_extent + 20))
                         , cy (toString (yAxis.max_extent - yAxis_transform point.y))
                         , r "5"
                         , stroke color
@@ -612,7 +612,7 @@ updateIncubation incubation updater point =
 
 
 
---- todo  move flux updating here by passing in the extractor
+--- TODO: move flux updating here by passing in the extractor
 
 
 updateRunStandard : Run -> (List Standard -> Point -> List Standard) -> Point -> Run
