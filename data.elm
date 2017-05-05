@@ -333,7 +333,7 @@ runDecoder =
         |> required "file" JD.string
         |> hardcoded []
         |> required "incubations" (JD.list incubationDecoder)
-        |> hardcoded []
+        |> required "standards" (JD.list standardDecoder)
         |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing

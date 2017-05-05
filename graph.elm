@@ -475,24 +475,20 @@ renderList points =
 
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
-    let
-        _ =
-            Debug.log "n2o" (n2o_injections incubation.injections)
-    in
-        div []
-            [ draw_injections N2O (n2o_injections incubation.injections)
-            , draw_injections CO2 (co2_injections incubation.injections)
-            , draw_injections CH4 (ch4_injections incubation.injections)
-            ]
+    div []
+        [ draw_injections N2O (n2o_injections incubation.injections)
+        , draw_injections CO2 (co2_injections incubation.injections)
+        , draw_injections CH4 (ch4_injections incubation.injections)
+        ]
 
 
 view : Model -> Html Msg
 view model =
     div []
         [ div []
-            [ draw_standards N2O (n2o_standards model.incubation.standards)
-            , draw_standards CO2 (co2_standards model.incubation.standards)
-            , draw_standards CH4 (ch4_standards model.incubation.standards)
+            [ draw_standards N2O (n2o_standards model.run.standards)
+            , draw_standards CO2 (co2_standards model.run.standards)
+            , draw_standards CH4 (ch4_standards model.run.standards)
             , button
                 [ onClick SaveStandards ]
                 [ Html.text "Save" ]

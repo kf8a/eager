@@ -9,6 +9,7 @@ simpleRunJson =
     "n2o_slope": null,
     "n2o_r2": null,
     "n2o_intercept": null,
+    "standards": [],
     "incubations": [],
     "id": 1,
     "file": "EAGER1.CSV",
@@ -31,6 +32,23 @@ runJson =
     "n2o_slope": null,
     "n2o_r2": null,
     "n2o_intercept": null,
+    "standards": [{
+          "n2o_ppm": 0.0,
+          "n2o_mv": 0.0,
+          "id": 2,
+          "co2_ppm": 0.0,
+          "co2_mv": 0.0,
+          "ch4_ppm": 0.0,
+          "ch4_mv": 0.0
+      }, {
+          "n2o_ppm": 0.0,
+          "n2o_mv": 0.0,
+          "id": 3,
+          "co2_ppm": 0.0,
+          "co2_mv": 0.0,
+          "ch4_ppm": 0.0,
+          "ch4_mv": 0.0
+      } ],
     "incubations": [{
       "sampled_at": "2016-05-11T13:30:00",
       "injections": [{
