@@ -275,33 +275,6 @@ updateCalibrationCO2 run point =
 
 
 
--- Translators
-
-
-toIncubation : List Injection -> List Standard -> Incubation
-toIncubation injections standards =
-    let
-        co2s =
-            toFit (co2_injections injections)
-
-        ch4s =
-            toFit (ch4_injections injections)
-
-        n2os =
-            toFit (n2o_injections injections)
-    in
-        Incubation
-            injections
-            1
-            (Just co2s)
-            (Just ch4s)
-            (Just n2os)
-            Nothing
-            Nothing
-            Nothing
-
-
-
 --- VIEW
 
 
@@ -663,19 +636,9 @@ base_url =
     "http://localhost:4000/api/"
 
 
-url : String
-url =
-    base_url ++ "injections?incubation_id=35191"
-
-
-standardUrl : String
-standardUrl =
-    base_url ++ "standard_curves/1"
-
-
 runUrl : String
 runUrl =
-    base_url ++ "runs/2"
+    base_url ++ "runs/4"
 
 
 fetchRun : String -> Cmd Msg
@@ -684,25 +647,12 @@ fetchRun url =
         |> Http.send LoadRun
 
 
-standardSaved : Result Http.Error () -> Msg
-standardSaved result =
-    case result of
-        Ok _ ->
-            NoOp
 
-        Err msg ->
-            let
-                _ =
-                    Debug.log "ERROR standardSaved  " msg
-            in
-                NoOp
-
-
-saveStandardList : List Standard -> Cmd Msg
-saveStandardList standardList =
-    HttpBuilder.post "http://localhost:4000/api/standards"
-        |> withJsonBody (standardListEncoder standardList)
-        |> send standardSaved
+-- saveStandardList : List Standard -> Cmd Msg
+-- saveStandardList standardList =
+--     HttpBuilder.post "http://localhost:4000/api/standards"
+--         |> withJsonBody (standardListEncoder standardList)
+--         |> send standardSaved
 
 
 updateIncubation : Incubation -> (List Injection -> Point -> List Injection) -> Point -> Incubation
