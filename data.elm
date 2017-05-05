@@ -75,6 +75,9 @@ type alias Injection =
     { co2_ppm : Float
     , n2o_ppm : Float
     , ch4_ppm : Float
+    , co2_mv : Float
+    , n2o_mv : Float
+    , ch4_mv : Float
     , id : Int
     , co2_deleted : Bool
     , n2o_deleted : Bool
@@ -125,6 +128,11 @@ initialStandard =
     , ch4_deleted = False
     , id = 0
     }
+
+
+initialFlux : Flux
+initialFlux =
+    Flux 0 0 0
 
 
 initialStandards : List Standard
@@ -236,6 +244,9 @@ decodeIncubationList json =
 injectionDecoder : Decoder Injection
 injectionDecoder =
     decode Injection
+        |> hardcoded 0
+        |> hardcoded 0
+        |> hardcoded 0
         |> required "co2" JD.float
         |> required "n2o" JD.float
         |> required "ch4" JD.float
@@ -269,7 +280,7 @@ decodeInjection json =
                 date =
                     Date.fromTime (Time.inSeconds 0)
             in
-                Injection 0 0 0 0 False False False date
+                Injection 0 0 0 0 0 0 0 False False False date
 
 
 decodeInjections : String -> List Injection

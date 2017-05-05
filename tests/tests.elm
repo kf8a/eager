@@ -30,7 +30,7 @@ injection1 =
         date =
             DE.fromParts 2017 May 1 12 50 0 0
     in
-        Injection 500 0.3 2 1 False False False date
+        Injection 500 0.3 2 0 0 0 1 False False False date
 
 
 injection2 : Injection
@@ -39,7 +39,7 @@ injection2 =
         date =
             DE.fromParts 2017 May 1 12 55 0 0
     in
-        Injection 600 0.6 1 2 False False False date
+        Injection 600 0.6 1 0 0 0 2 False False False date
 
 
 all : Test
@@ -112,7 +112,7 @@ all =
                             DE.fromParts 2017 May 1 12 50 0 0
                     in
                         updateN2OInjection injection1 n2oPoint
-                            |> Expect.equal (Injection 500 9 2 1 False False False date)
+                            |> Expect.equal (Injection 500 9 2 0 0 0 1 False False False date)
             ]
         , describe "least squares fit"
             [ test "simple fit" <|

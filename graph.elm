@@ -127,19 +127,38 @@ fluxWithDefault fit =
             Flux 0 0 0
 
 
-calibrateIncubationCO2 : Incubation -> Incubation
-calibrateIncubationCO2 incubation =
-    incubation
+calibrateInjectionCO2 : Flux -> Injection -> Injection
+calibrateInjectionCO2 calibration injection =
+    let
+        co2_ppm =
+            calibration.intercept + calibration.slope * injection.co2_mv
+    in
+        { injection | co2_ppm = co2_ppm }
+
+
+calibrateIncubationCO2 : Flux -> Incubation -> Incubation
+calibrateIncubationCO2 calibration incubation =
+    let
+        injections =
+            incubation.injections
+                |> List.map (calibrateInjectionCO2 calibration)
+    in
+        { incubation | injections = injections }
 
 
 calibrateRunCO2 : Run -> Run
 calibrateRunCO2 run =
-    let
-        newIncubationList =
-            run.incubations
-                |> List.map calibrateIncubationCO2
-    in
-        { run | incubations = newIncubationList }
+    case run.co2_calibration of
+        Just calibration ->
+            let
+                newIncubationList =
+                    run.incubations
+                        |> List.map (calibrateIncubationCO2 calibration)
+            in
+                { run | incubations = newIncubationList }
+
+        Nothing ->
+            run
 
 
 
@@ -611,22 +630,6 @@ updateRunStandard run updater point =
         new_run
 
 
-
--- updateStandard : Incubation -> (List Standard -> Point -> List Standard) -> Point -> Incubation
--- updateStandard incubation updater point =
---     let
---         new_point =
---             { point | deleted = not point.deleted }
---
---         new_standards =
---             updater incubation.standards new_point
---
---         new_incubation =
---             { incubation | standards = new_standards }
---     in
---         new_incubation
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -715,6 +718,7 @@ update msg model =
 
                 newRun =
                     { updatedRun | co2_calibration = Just new_flux }
+                        |> calibrateRunCO2
             in
                 ( { model | run = newRun }, Cmd.none )
 
@@ -794,6 +798,7 @@ update msg model =
                 ( model, Cmd.none )
 
         LoadRun (Ok run) ->
+            -- TODO: Compute calibration on load
             ( { model | run = run }, Cmd.none )
 
         LoadRun (Err msg) ->
