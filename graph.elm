@@ -287,20 +287,6 @@ computeFlux points =
         |> fluxWithDefault
 
 
-computeCO2Flux : Incubation -> Flux
-computeCO2Flux incubation =
-    incubation.injections
-        |> co2_injections
-        |> computeFlux
-
-
-computeCH4Flux : Incubation -> Flux
-computeCH4Flux incubation =
-    incubation.injections
-        |> ch4_injections
-        |> computeFlux
-
-
 computeIncubationFluxes : Incubation -> Incubation
 computeIncubationFluxes incubation =
     let
@@ -447,56 +433,85 @@ drawYAxis xAxis yAxis =
         []
 
 
-drawRegressionLine : Axis -> Axis -> Flux -> Svg Msg
+drawRegressionLine : Axis -> Axis -> Maybe Flux -> Svg Msg
 drawRegressionLine xAxis yAxis flux =
+    case flux of
+        Just flux ->
+            let
+                xAxisTransform =
+                    axisTransform xAxis
+
+                yAxisTransform =
+                    axisTransform yAxis
+            in
+                line
+                    [ x1 (toString (xAxisTransform xAxis.min_value))
+                    , x2 (toString (xAxisTransform xAxis.max_value))
+                    , y1 (toString (yAxis.max_extent - (yAxisTransform flux.intercept)))
+                    , y2
+                        (toString
+                            (yAxis.max_extent
+                                - (yAxisTransform (flux.intercept + flux.slope * xAxis.max_value))
+                            )
+                        )
+                    , stroke "black"
+                    , fill "black"
+                    ]
+                    []
+
+        Nothing ->
+            g [] []
+
+
+draw_standards : Gas -> Maybe Flux -> List Point -> Svg Msg
+draw_standards gas flux points =
     let
-        xAxisTransform =
-            axisTransform xAxis
-
-        yAxisTransform =
-            axisTransform yAxis
-    in
-        line
-            [ x1 (toString (xAxisTransform xAxis.min_value))
-            , x2 (toString (xAxisTransform xAxis.max_value))
-            , y1 (toString (yAxis.max_extent - (yAxisTransform flux.intercept)))
-            , y2
-                (toString
-                    (yAxis.max_extent
-                        - (yAxisTransform (flux.intercept + flux.slope * xAxis.max_value))
-                    )
-                )
-            , stroke "black"
-            , fill "black"
-            ]
-            []
-
-
-draw_standards : Gas -> List Point -> Svg Msg
-draw_standards gas points =
-    let
-        flux =
-            computeFlux points
-
         my_dots =
             standardDots gas points
     in
         draw_graph my_dots (toString gas) points flux
 
 
-draw_injections : Gas -> Incubation -> List Point -> Svg Msg
-draw_injections gas incubation points =
+draw_injections : Gas -> Maybe Flux -> Incubation -> List Point -> Svg Msg
+draw_injections gas flux incubation points =
     let
-        flux =
-            computeFlux points
-
         my_dots =
             injectionDots gas incubation points
     in
         draw_graph my_dots (toString gas) points flux
 
 
-draw_graph : List (Svg Msg) -> String -> List Point -> Flux -> Svg Msg
+renderFluxEq : String -> Maybe Flux -> Svg Msg
+renderFluxEq label flux =
+    case flux of
+        Just flux ->
+            let
+                eq =
+                    String.concat
+                        [ "y = "
+                        , Round.round 2 flux.intercept
+                        , " + "
+                        , Round.round 4 flux.slope
+                        , " x"
+                        ]
+
+                r =
+                    String.concat
+                        [ "r = "
+                        , Round.round 3 flux.r2
+                        ]
+            in
+                g []
+                    [ text_ [ x "10", y "20" ] [ Svg.text label ]
+                    , text_ [ x "10", y "40" ] [ Svg.text eq ]
+                    , text_ [ x "10", y "60" ] [ Svg.text r ]
+                    ]
+
+        Nothing ->
+            g [] []
+
+
+draw_graph : List (Svg Msg) -> String -> List Point -> Maybe Flux -> Svg Msg
 draw_graph drawing_func label points flux =
     let
         xAxis =
@@ -504,21 +519,6 @@ draw_graph drawing_func label points flux =
 
         yAxis =
             toYAxis points
-
-        eq =
-            String.concat
-                [ "y = "
-                , Round.round 2 flux.intercept
-                , " + "
-                , Round.round 4 flux.slope
-                , " x"
-                ]
-
-        r =
-            String.concat
-                [ "r = "
-                , Round.round 3 flux.r2
-                ]
     in
         svg
             [ width (toString (xAxis.max_extent + x_offset + 50))
@@ -532,11 +532,7 @@ draw_graph drawing_func label points flux =
                     [ drawXAxis xAxis yAxis
                     , drawYAxis xAxis yAxis
                     ]
-                , g []
-                    [ text_ [ x "10", y "20" ] [ Svg.text label ]
-                    , text_ [ x "10", y "40" ] [ Svg.text eq ]
-                    , text_ [ x "10", y "60" ] [ Svg.text r ]
-                    ]
+                , renderFluxEq label flux
                 , g []
                     drawing_func
                 ]
@@ -639,9 +635,9 @@ renderList points =
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
     div []
-        [ draw_injections N2O incubation (n2o_injections incubation.injections)
-        , draw_injections CO2 incubation (co2_injections incubation.injections)
-        , draw_injections CH4 incubation (ch4_injections incubation.injections)
+        [ draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)
+        , draw_injections CO2 incubation.co2_flux incubation (co2_injections incubation.injections)
+        , draw_injections CH4 incubation.ch4_flux incubation (ch4_injections incubation.injections)
         ]
 
 
@@ -656,9 +652,9 @@ view model =
         [ button [ onClick SaveRun ]
             [ Html.text "Save" ]
         , div []
-            [ draw_standards N2O (n2o_standards model.run.standards)
-            , draw_standards CO2 (co2_standards model.run.standards)
-            , draw_standards CH4 (ch4_standards model.run.standards)
+            [ draw_standards N2O model.run.n2o_calibration (n2o_standards model.run.standards)
+            , draw_standards CO2 model.run.co2_calibration (co2_standards model.run.standards)
+            , draw_standards CH4 model.run.ch4_calibration (ch4_standards model.run.standards)
             ]
         , div []
             (model.run.incubations
