@@ -448,7 +448,7 @@ runEncoder run =
 updateN2OStandard : Standard -> Point -> Standard
 updateN2OStandard standard n2o =
     if n2o.id == standard.id then
-        { standard | n2o_ppm = n2o.x, n2o_mv = n2o.y, n2o_deleted = n2o.deleted }
+        { standard | n2o_ppm = n2o.y, n2o_mv = n2o.x, n2o_deleted = n2o.deleted }
     else
         let
             -- TODO: Log this to the server side
@@ -464,7 +464,7 @@ updateN2OStandard standard n2o =
 updateCO2Standard : Standard -> Point -> Standard
 updateCO2Standard standard co2 =
     if co2.id == standard.id then
-        { standard | co2_ppm = co2.x, co2_mv = co2.y, co2_deleted = co2.deleted }
+        { standard | co2_ppm = co2.y, co2_mv = co2.x, co2_deleted = co2.deleted }
     else
         let
             -- TODO: Log this to the server side
@@ -480,7 +480,7 @@ updateCO2Standard standard co2 =
 updateCH4Standard : Standard -> Point -> Standard
 updateCH4Standard standard ch4 =
     if ch4.id == standard.id then
-        { standard | ch4_ppm = ch4.x, ch4_mv = ch4.y, ch4_deleted = ch4.deleted }
+        { standard | ch4_ppm = ch4.y, ch4_mv = ch4.x, ch4_deleted = ch4.deleted }
     else
         let
             -- TODO: Log this to the server side

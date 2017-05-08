@@ -233,7 +233,7 @@ calibrateRunCO2 run =
 
 computeCalibrationN2O : List Standard -> Flux
 computeCalibrationN2O standards =
-    toFit (ch4_standards standards)
+    toFit (n2o_standards standards)
 
 
 computeCalibrationCH4 : List Standard -> Flux
@@ -252,8 +252,11 @@ updateCalibrationN2O run point =
         updatedRun =
             updateRunStandard run (updateN2OStandards) point
     in
-        { updatedRun | n2o_calibration = Just (computeCalibrationN2O updatedRun.standards) }
+        { updatedRun
+            | n2o_calibration = Just (computeCalibrationN2O updatedRun.standards)
+        }
             |> calibrateRunN2O
+            |> computeN2OFluxes
 
 
 updateCalibrationCH4 : Run -> Point -> Run
@@ -264,6 +267,7 @@ updateCalibrationCH4 run point =
     in
         { updatedRun | ch4_calibration = Just (computeCalibrationCH4 updatedRun.standards) }
             |> calibrateRunCH4
+            |> computeCH4Fluxes
 
 
 updateCalibrationCO2 : Run -> Point -> Run
@@ -274,6 +278,7 @@ updateCalibrationCO2 run point =
     in
         { updatedRun | co2_calibration = Just (computeCalibrationCO2 updatedRun.standards) }
             |> calibrateRunCO2
+            |> computeCO2Fluxes
 
 
 
@@ -746,6 +751,60 @@ updateRunStandard run updater point =
         new_run
 
 
+computeCO2Flux : Incubation -> Incubation
+computeCO2Flux incubation =
+    let
+        new_flux =
+            toFit (co2_injections incubation.injections)
+    in
+        { incubation | co2_flux = Just new_flux }
+
+
+computeN2OFlux : Incubation -> Incubation
+computeN2OFlux incubation =
+    let
+        new_flux =
+            toFit (n2o_injections incubation.injections)
+    in
+        { incubation | n2o_flux = Just new_flux }
+
+
+computeCH4Flux : Incubation -> Incubation
+computeCH4Flux incubation =
+    let
+        new_flux =
+            toFit (ch4_injections incubation.injections)
+    in
+        { incubation | ch4_flux = Just new_flux }
+
+
+computeN2OFluxes : Run -> Run
+computeN2OFluxes run =
+    let
+        incubations =
+            List.map computeN2OFlux run.incubations
+    in
+        { run | incubations = incubations }
+
+
+computeCO2Fluxes : Run -> Run
+computeCO2Fluxes run =
+    let
+        incubations =
+            List.map computeCO2Flux run.incubations
+    in
+        { run | incubations = incubations }
+
+
+computeCH4Fluxes : Run -> Run
+computeCH4Fluxes run =
+    let
+        incubations =
+            List.map computeCH4Flux run.incubations
+    in
+        { run | incubations = incubations }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -754,11 +813,8 @@ update msg model =
                 updated_incubation =
                     updateIncubation incubation (update_co2_injections) point
 
-                new_flux =
-                    toFit (co2_injections updated_incubation.injections)
-
                 newIncubation =
-                    { updated_incubation | co2_flux = Just new_flux }
+                    computeCO2Flux updated_incubation
 
                 ( oldIncubation, rest ) =
                     List.partition (\x -> x.id == incubation.id) model.run.incubations
@@ -779,11 +835,8 @@ update msg model =
                 updated_incubation =
                     updateIncubation incubation (update_ch4_injections) point
 
-                new_flux =
-                    toFit (ch4_injections updated_incubation.injections)
-
                 newIncubation =
-                    { updated_incubation | ch4_flux = Just new_flux }
+                    computeN2OFlux updated_incubation
 
                 ( oldIncubation, rest ) =
                     List.partition (\x -> x.id == incubation.id) model.run.incubations
@@ -894,7 +947,7 @@ update msg model =
                         |> calibrateRunN2O
 
                 updatedRun =
-                    { run | incubations = List.map computeIncubationFluxes newRun.incubations }
+                    { newRun | incubations = List.map computeIncubationFluxes newRun.incubations }
             in
                 ( { model | run = updatedRun }, Cmd.none )
 
