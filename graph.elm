@@ -710,9 +710,14 @@ runSaved result =
                 NoOp
 
 
+saveUrl : Int -> String
+saveUrl id =
+    "http://localhost:4000/api/runs/" ++ (toString id)
+
+
 saveRun : Run -> Cmd Msg
 saveRun run =
-    HttpBuilder.post "http://localhost:4000/api/runs "
+    HttpBuilder.put (saveUrl run.id)
         |> withJsonBody (runEncoder run)
         |> send runSaved
 

@@ -7,6 +7,7 @@ import Time exposing (..)
 import Json.Decode as JD exposing (..)
 import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Json.Encode as JE exposing (..)
+import Json.Encode.Extra as JEE exposing (..)
 
 
 type alias Flux =
@@ -383,38 +384,13 @@ injectionEncoder injection =
 
 incubationEncoder : Incubation -> JE.Value
 incubationEncoder incubation =
-    let
-        n2o_flux =
-            case incubation.n2o_flux of
-                Just flux ->
-                    JE.float flux.slope
-
-                Nothing ->
-                    JE.null
-
-        co2_flux =
-            case incubation.co2_flux of
-                Just flux ->
-                    JE.float flux.slope
-
-                Nothing ->
-                    JE.null
-
-        ch4_flux =
-            case incubation.ch4_flux of
-                Just flux ->
-                    JE.float flux.slope
-
-                Nothing ->
-                    JE.null
-    in
-        JE.object
-            [ ( "injections", JE.list (List.map injectionEncoder incubation.injections) )
-            , ( "id", JE.int incubation.id )
-            , ( "n2o_flux", n2o_flux )
-            , ( "co2_flux", co2_flux )
-            , ( "ch4_flux", ch4_flux )
-            ]
+    JE.object
+        [ ( "injections", JE.list (List.map injectionEncoder incubation.injections) )
+        , ( "id", JE.int incubation.id )
+        , ( "n2o_flux", JEE.maybe fluxEncoder incubation.n2o_flux )
+        , ( "co2_flux", JEE.maybe fluxEncoder incubation.co2_flux )
+        , ( "ch4_flux", JEE.maybe fluxEncoder incubation.ch4_flux )
+        ]
 
 
 standardEncoder : Standard -> JE.Value
@@ -432,12 +408,32 @@ standardListEncoder standardList =
     JE.object [ ( "standards", JE.list (List.map standardEncoder standardList) ) ]
 
 
+fluxEncoder : Flux -> JE.Value
+fluxEncoder flux =
+    JE.object
+        [ ( "slope", JE.float flux.slope )
+        , ( "intercept", JE.float flux.intercept )
+        , ( "r2", JE.float flux.r2 )
+        ]
+
+
 runEncoder : Run -> JE.Value
 runEncoder run =
+    JE.object
+        [ ( "id", JE.int run.id )
+        , ( "run", (runDetailEncoder run) )
+        ]
+
+
+runDetailEncoder : Run -> JE.Value
+runDetailEncoder run =
     JE.object
         [ ( "incubations", JE.list (List.map incubationEncoder run.incubations) )
         , ( "standards", JE.list (List.map standardEncoder run.standards) )
         , ( "id", JE.int run.id )
+        , ( "co2_calibration", JEE.maybe fluxEncoder run.co2_calibration )
+        , ( "n2o_calibration", JEE.maybe fluxEncoder run.n2o_calibration )
+        , ( "ch4_calibration", JEE.maybe fluxEncoder run.ch4_calibration )
         ]
 
 
