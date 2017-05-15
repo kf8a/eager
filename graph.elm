@@ -119,10 +119,10 @@ fluxWithDefault : Result String Fit -> Flux
 fluxWithDefault fit =
     case fit of
         Ok fit ->
-            Flux fit.slope fit.intercept fit.r2
+            Flux fit.slope fit.intercept fit.r2 Nothing
 
         Err message ->
-            Flux 0 0 0
+            initialFlux
 
 
 
@@ -687,7 +687,7 @@ base_url =
 
 runUrl : String
 runUrl =
-    base_url ++ "runs/4"
+    base_url ++ "runs/2"
 
 
 fetchRun : String -> Cmd Msg

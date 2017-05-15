@@ -14,6 +14,7 @@ type alias Flux =
     { slope : Float
     , intercept : Float
     , r2 : Float
+    , id : Maybe Int
     }
 
 
@@ -33,6 +34,9 @@ type alias Incubation =
     { injections : List Injection
     , id : Int
     , status : Status
+    , chamber : String
+    , height : Float
+    , wind : String
     , co2_flux : Maybe Flux
     , ch4_flux : Maybe Flux
     , n2o_flux : Maybe Flux
@@ -99,6 +103,9 @@ initialIncubation =
     { injections = []
     , id = 0
     , status = NotChecked
+    , chamber = "NA"
+    , height = 0
+    , wind = "NA"
     , co2_flux = Nothing
     , ch4_flux = Nothing
     , n2o_flux = Nothing
@@ -127,7 +134,7 @@ initialStandard =
 
 initialFlux : Flux
 initialFlux =
-    Flux 0 0 0
+    Flux 0 0 0 Nothing
 
 
 initialStandards : List Standard
@@ -185,6 +192,7 @@ fluxDecoder =
         |> required "slope" JD.float
         |> required "intercept" JD.float
         |> required "r2" JD.float
+        |> optional "id" (JD.map Just JD.int) Nothing
 
 
 incubationDecoder : Decoder Incubation
@@ -193,6 +201,9 @@ incubationDecoder =
         |> required "injections" (JD.list injectionDecoder)
         |> required "id" JD.int
         |> hardcoded NotChecked
+        |> required "chamber" JD.string
+        |> required "height" JD.float
+        |> required "wind" JD.string
         |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
@@ -244,8 +255,8 @@ injectionDecoder =
         |> required "n2o" JD.float
         |> required "ch4" JD.float
         |> required "id" JD.int
-        |> optional "n2o_deleted" JD.bool False
         |> optional "co2_deleted" JD.bool False
+        |> optional "n2o_deleted" JD.bool False
         |> optional "ch4_deleted" JD.bool False
         |> required "sampled_at" date
 
@@ -378,7 +389,7 @@ injectionEncoder injection =
         , ( "id", JE.int injection.id )
         , ( "co2_deleted", JE.bool injection.co2_deleted )
         , ( "n2o_deleted", JE.bool injection.n2o_deleted )
-        , ( "ch4_deleted", JE.bool injection.co2_deleted )
+        , ( "ch4_deleted", JE.bool injection.ch4_deleted )
         ]
 
 
@@ -414,6 +425,7 @@ fluxEncoder flux =
         [ ( "slope", JE.float flux.slope )
         , ( "intercept", JE.float flux.intercept )
         , ( "r2", JE.float flux.r2 )
+        , ( "id", JEE.maybe JE.int flux.id )
         ]
 
 
