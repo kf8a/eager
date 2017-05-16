@@ -71,6 +71,7 @@ type alias Model =
     { run : Run
     , next_run : Maybe Run
     , status : Status
+    , saving : Bool
     }
 
 
@@ -332,9 +333,9 @@ standardDecoder =
         |> required "co2_mv" JD.float
         |> required "ch4_ppm" JD.float
         |> required "ch4_mv" JD.float
-        |> optional "n2o_deleted" JD.bool False
-        |> optional "co2_deleted" JD.bool False
-        |> optional "ch4_deleted" JD.bool False
+        |> required "n2o_deleted" JD.bool
+        |> required "co2_deleted" JD.bool
+        |> required "ch4_deleted" JD.bool
         |> required "id" JD.int
 
 

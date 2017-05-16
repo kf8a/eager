@@ -26,7 +26,7 @@ type Msg
     = SwitchInjection Gas Incubation Point
     | SwitchStandard Gas Point
     | LoadRun (Result Http.Error Run)
-    | RunSaved (Result Http.Error Run)
+    | RunSaved (Result Http.Error ())
     | SaveRun
       -- | FluxGood Incubation
       -- | FluxMaybeGood Incubation
@@ -40,6 +40,7 @@ initialModel =
     { run = initialRun
     , next_run = Nothing
     , status = NotChecked
+    , saving = False
     }
 
 
@@ -577,12 +578,12 @@ dot xAxis yAxis msg point =
 
 toXAxis : List Point -> Axis
 toXAxis points =
-    Axis 0 200 0 (maxX points)
+    Axis 0 100 0 (maxX points)
 
 
 toYAxis : List Point -> Axis
 toYAxis points =
-    Axis 0 200 0 (maxY points)
+    Axis 0 100 0 (maxY points)
 
 
 standardDots : Gas -> List Point -> List (Svg Msg)
@@ -625,7 +626,8 @@ renderList points =
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
     div []
-        [ draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)
+        [ span [] [ Html.text incubation.chamber ]
+        , draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)
         , draw_injections CO2 incubation.co2_flux incubation (co2_injections incubation.injections)
         , draw_injections CH4 incubation.ch4_flux incubation (ch4_injections incubation.injections)
         ]
@@ -636,11 +638,22 @@ orderedIncubation a b =
     Basics.compare a.id b.id
 
 
+showSavingIndicator : Model -> Html Msg
+showSavingIndicator model =
+    case model.saving of
+        True ->
+            div [] [ Html.text "Saving run" ]
+
+        False ->
+            div [] []
+
+
 view : Model -> Html Msg
 view model =
     div []
         [ button [ onClick SaveRun ]
             [ Html.text "Save" ]
+        , showSavingIndicator model
         , div []
             [ draw_standards N2O model.run.n2o_calibration (n2o_standards model.run.standards)
             , draw_standards CO2 model.run.co2_calibration (co2_standards model.run.standards)
@@ -672,7 +685,7 @@ base_url =
 
 runUrl : String
 runUrl =
-    base_url ++ "runs/2"
+    base_url ++ "runs/5"
 
 
 fetchRun : String -> Cmd Msg
@@ -683,16 +696,20 @@ fetchRun url =
 
 runSaved : Result Http.Error () -> Msg
 runSaved result =
-    case result of
-        Ok _ ->
-            NoOp
+    RunSaved result
 
-        Err msg ->
-            let
-                _ =
-                    Debug.log "ERROR" msg
-            in
-                NoOp
+
+
+-- case result of
+--     Ok _ ->
+--         RunSaved
+--
+--     Err msg ->
+--         let
+--             _ =
+--                 Debug.log "ERROR" msg
+--         in
+--             NoOp
 
 
 saveUrl : Int -> String
@@ -806,14 +823,14 @@ update msg model =
                 newIncubation =
                     computeCO2Flux updated_incubation
 
+                run =
+                    model.run
+
                 ( oldIncubation, rest ) =
-                    List.partition (\x -> x.id == incubation.id) model.run.incubations
+                    List.partition (\x -> x.id == incubation.id) run.incubations
 
                 newIncubationList =
                     List.concat [ rest, [ newIncubation ] ]
-
-                run =
-                    model.run
 
                 newRun =
                     { run | incubations = newIncubationList }
@@ -822,20 +839,20 @@ update msg model =
 
         SwitchInjection CH4 incubation point ->
             let
+                run =
+                    model.run
+
                 updated_incubation =
                     updateIncubation incubation (update_ch4_injections) point
 
                 newIncubation =
-                    computeN2OFlux updated_incubation
+                    computeCH4Flux updated_incubation
 
                 ( oldIncubation, rest ) =
-                    List.partition (\x -> x.id == incubation.id) model.run.incubations
+                    List.partition (\x -> x.id == incubation.id) run.incubations
 
                 newIncubationList =
                     List.concat [ rest, [ newIncubation ] ]
-
-                run =
-                    model.run
 
                 newRun =
                     { run | incubations = newIncubationList }
@@ -853,14 +870,14 @@ update msg model =
                 newIncubation =
                     { updated_incubation | n2o_flux = Just new_flux }
 
+                run =
+                    model.run
+
                 ( oldIncubation, rest ) =
-                    List.partition (\x -> x.id == incubation.id) model.run.incubations
+                    List.partition (\x -> x.id == incubation.id) run.incubations
 
                 newIncubationList =
                     List.concat [ rest, [ newIncubation ] ]
-
-                run =
-                    model.run
 
                 newRun =
                     { run | incubations = newIncubationList }
@@ -913,13 +930,13 @@ update msg model =
         --         --- TODO: need to alert the user that something failed
         --         ( model, Cmd.none )
         RunSaved (Ok run) ->
-            ( model, Cmd.none )
+            ( { model | saving = False }, Cmd.none )
 
         RunSaved (Err msg) ->
             ( model, Cmd.none )
 
         SaveRun ->
-            ( model, saveRun model.run )
+            ( { model | saving = True }, saveRun model.run )
 
         LoadRun (Ok run) ->
             let
