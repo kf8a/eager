@@ -22,12 +22,6 @@ import Round exposing (..)
 import Data exposing (..)
 
 
-type Gas
-    = CO2
-    | N2O
-    | CH4
-
-
 type Msg
     = SwitchInjection Gas Incubation Point
     | SwitchStandard Gas Point
@@ -106,20 +100,11 @@ interval startTime time =
     ((Date.toTime time) - Date.toTime (startTime)) / 1000 / 60
 
 
-toFit : List Point -> Flux
-toFit points =
-    let
-        fit =
-            fitLineByLeastSquares points
-    in
-        fluxWithDefault fit
-
-
-fluxWithDefault : Result String Fit -> Flux
-fluxWithDefault fit =
+fluxWithDefault : Gas -> Result String Fit -> Flux
+fluxWithDefault gas fit =
     case fit of
         Ok fit ->
-            Flux fit.slope fit.intercept fit.r2 Nothing
+            Flux fit.slope fit.intercept fit.r2 Nothing gas
 
         Err message ->
             initialFlux
@@ -233,17 +218,17 @@ calibrateRunCO2 run =
 
 computeCalibrationN2O : List Standard -> Flux
 computeCalibrationN2O standards =
-    toFit (n2o_standards standards)
+    computeFlux N2O (n2o_standards standards)
 
 
 computeCalibrationCH4 : List Standard -> Flux
 computeCalibrationCH4 standards =
-    toFit (ch4_standards standards)
+    computeFlux CH4 (ch4_standards standards)
 
 
 computeCalibrationCO2 : List Standard -> Flux
 computeCalibrationCO2 standards =
-    toFit (co2_standards standards)
+    computeFlux CO2 (co2_standards standards)
 
 
 updateCalibrationN2O : Run -> Point -> Run
@@ -285,11 +270,11 @@ updateCalibrationCO2 run point =
 --- Compute Fluxes
 
 
-computeFlux : List Point -> Flux
-computeFlux points =
+computeFlux : Gas -> List Point -> Flux
+computeFlux gas points =
     points
         |> fitLineByLeastSquares
-        |> fluxWithDefault
+        |> fluxWithDefault gas
 
 
 computeIncubationFluxes : Incubation -> Incubation
@@ -298,17 +283,17 @@ computeIncubationFluxes incubation =
         n2o_flux =
             incubation.injections
                 |> n2o_injections
-                |> computeFlux
+                |> computeFlux N2O
 
         co2_flux =
             incubation.injections
                 |> co2_injections
-                |> computeFlux
+                |> computeFlux CO2
 
         ch4_flux =
             incubation.injections
                 |> ch4_injections
-                |> computeFlux
+                |> computeFlux CH4
     in
         { incubation
             | n2o_flux = Just n2o_flux
@@ -760,7 +745,7 @@ computeCO2Flux : Incubation -> Incubation
 computeCO2Flux incubation =
     let
         new_flux =
-            toFit (co2_injections incubation.injections)
+            computeFlux CO2 (co2_injections incubation.injections)
     in
         { incubation | co2_flux = Just new_flux }
 
@@ -769,7 +754,7 @@ computeN2OFlux : Incubation -> Incubation
 computeN2OFlux incubation =
     let
         new_flux =
-            toFit (n2o_injections incubation.injections)
+            computeFlux N2O (n2o_injections incubation.injections)
     in
         { incubation | n2o_flux = Just new_flux }
 
@@ -778,7 +763,7 @@ computeCH4Flux : Incubation -> Incubation
 computeCH4Flux incubation =
     let
         new_flux =
-            toFit (ch4_injections incubation.injections)
+            computeFlux CH4 (ch4_injections incubation.injections)
     in
         { incubation | ch4_flux = Just new_flux }
 
@@ -863,7 +848,7 @@ update msg model =
                     updateIncubation incubation (update_n2o_injections) point
 
                 new_flux =
-                    toFit (n2o_injections updated_incubation.injections)
+                    computeFlux N2O (n2o_injections updated_incubation.injections)
 
                 newIncubation =
                     { updated_incubation | n2o_flux = Just new_flux }
@@ -882,6 +867,9 @@ update msg model =
             in
                 ( { model | run = newRun }, Cmd.none )
 
+        SwitchInjection NoGas incubation point ->
+            ( model, Cmd.none )
+
         SwitchStandard CO2 point ->
             ( { model | run = updateCalibrationCO2 model.run point }, Cmd.none )
 
@@ -890,6 +878,9 @@ update msg model =
 
         SwitchStandard N2O point ->
             ( { model | run = updateCalibrationN2O model.run point }, Cmd.none )
+
+        SwitchStandard NoGas point ->
+            ( model, Cmd.none )
 
         -- FluxGood incubation ->
         --     let

@@ -15,6 +15,7 @@ type alias Flux =
     , intercept : Float
     , r2 : Float
     , id : Maybe Int
+    , gas : Gas
     }
 
 
@@ -40,6 +41,7 @@ type alias Incubation =
     , co2_flux : Maybe Flux
     , ch4_flux : Maybe Flux
     , n2o_flux : Maybe Flux
+    , fluxes : List Flux
     }
 
 
@@ -94,6 +96,13 @@ type Status
     | NotChecked
 
 
+type Gas
+    = CO2
+    | N2O
+    | CH4
+    | NoGas
+
+
 
 --- initial data
 
@@ -109,6 +118,7 @@ initialIncubation =
     , co2_flux = Nothing
     , ch4_flux = Nothing
     , n2o_flux = Nothing
+    , fluxes = []
     }
 
 
@@ -134,7 +144,7 @@ initialStandard =
 
 initialFlux : Flux
 initialFlux =
-    Flux 0 0 0 Nothing
+    Flux 0 0 0 Nothing NoGas
 
 
 initialStandards : List Standard
@@ -193,6 +203,7 @@ fluxDecoder =
         |> required "intercept" JD.float
         |> required "r2" JD.float
         |> optional "id" (JD.map Just JD.int) Nothing
+        |> hardcoded NoGas
 
 
 incubationDecoder : Decoder Incubation
@@ -207,6 +218,7 @@ incubationDecoder =
         |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
+        |> hardcoded []
 
 
 responseIncubationDecoder : Decoder Incubation
@@ -320,9 +332,9 @@ standardDecoder =
         |> required "co2_mv" JD.float
         |> required "ch4_ppm" JD.float
         |> required "ch4_mv" JD.float
-        |> hardcoded False
-        |> hardcoded False
-        |> hardcoded False
+        |> optional "n2o_deleted" JD.bool False
+        |> optional "co2_deleted" JD.bool False
+        |> optional "ch4_deleted" JD.bool False
         |> required "id" JD.int
 
 
@@ -398,9 +410,13 @@ incubationEncoder incubation =
     JE.object
         [ ( "injections", JE.list (List.map injectionEncoder incubation.injections) )
         , ( "id", JE.int incubation.id )
-        , ( "n2o_flux", JEE.maybe fluxEncoder incubation.n2o_flux )
-        , ( "co2_flux", JEE.maybe fluxEncoder incubation.co2_flux )
-        , ( "ch4_flux", JEE.maybe fluxEncoder incubation.ch4_flux )
+        , ( "fluxes"
+          , JE.list
+                [ JEE.maybe fluxEncoder incubation.n2o_flux
+                , JEE.maybe fluxEncoder incubation.co2_flux
+                , JEE.maybe fluxEncoder incubation.ch4_flux
+                ]
+          )
         ]
 
 
@@ -419,6 +435,22 @@ standardListEncoder standardList =
     JE.object [ ( "standards", JE.list (List.map standardEncoder standardList) ) ]
 
 
+gasEncoder : Gas -> JE.Value
+gasEncoder gas =
+    case gas of
+        N2O ->
+            JE.string "n2o"
+
+        CO2 ->
+            JE.string "co2"
+
+        CH4 ->
+            JE.string "ch4"
+
+        NoGas ->
+            JE.string "no_gas"
+
+
 fluxEncoder : Flux -> JE.Value
 fluxEncoder flux =
     JE.object
@@ -426,6 +458,7 @@ fluxEncoder flux =
         , ( "intercept", JE.float flux.intercept )
         , ( "r2", JE.float flux.r2 )
         , ( "id", JEE.maybe JE.int flux.id )
+        , ( "gas", gasEncoder flux.gas )
         ]
 
 
@@ -443,9 +476,13 @@ runDetailEncoder run =
         [ ( "incubations", JE.list (List.map incubationEncoder run.incubations) )
         , ( "standards", JE.list (List.map standardEncoder run.standards) )
         , ( "id", JE.int run.id )
-        , ( "co2_calibration", JEE.maybe fluxEncoder run.co2_calibration )
-        , ( "n2o_calibration", JEE.maybe fluxEncoder run.n2o_calibration )
-        , ( "ch4_calibration", JEE.maybe fluxEncoder run.ch4_calibration )
+        , ( "calibrations"
+          , JE.list
+                [ JEE.maybe fluxEncoder run.co2_calibration
+                , JEE.maybe fluxEncoder run.n2o_calibration
+                , JEE.maybe fluxEncoder run.ch4_calibration
+                ]
+          )
         ]
 
 
