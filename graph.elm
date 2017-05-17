@@ -1,7 +1,6 @@
 module Graph exposing (..)
 
 import Date exposing (..)
-import Date.Extra as DE exposing (..)
 import Time exposing (..)
 import Html
 import Html exposing (..)
@@ -28,6 +27,7 @@ type Msg
     | LoadRun (Result Http.Error Run)
     | RunSaved (Result Http.Error ())
     | SaveRun
+    | LoadRunIds (Result Http.Error (List Run))
       -- | FluxGood Incubation
       -- | FluxMaybeGood Incubation
       -- | FluxBad Incubation
@@ -41,6 +41,9 @@ initialModel =
     , next_run = Nothing
     , status = NotChecked
     , saving = False
+    , error = Nothing
+    , previous_runs = []
+    , next_runs = []
     }
 
 
@@ -683,14 +686,25 @@ base_url =
     "http://localhost:4000/api/"
 
 
-runUrl : String
-runUrl =
-    base_url ++ "runs/5"
+runUrl : Int -> String
+runUrl id =
+    base_url ++ "runs/" ++ (toString id)
 
 
-fetchRun : String -> Cmd Msg
-fetchRun url =
-    Http.get url runResponseDecoder
+runIdUrl : String
+runIdUrl =
+    base_url ++ "runs"
+
+
+fetchRunIds : Cmd Msg
+fetchRunIds =
+    Http.get runIdUrl runIdResponseDecoder
+        |> Http.send LoadRunIds
+
+
+fetchRun : Run -> Cmd Msg
+fetchRun run =
+    Http.get (runUrl run.id) runResponseDecoder
         |> Http.send LoadRun
 
 
@@ -971,10 +985,30 @@ update msg model =
             in
                 ( model, Cmd.none )
 
+        LoadRunIds (Ok runs) ->
+            let
+                current_run =
+                    Maybe.withDefault initialRun (List.head runs)
+
+                next_runs =
+                    Maybe.withDefault [] (List.tail runs)
+            in
+                -- TODO: fetch first run
+                ( { model | run = current_run, next_runs = next_runs }
+                , (fetchRun current_run)
+                )
+
+        LoadRunIds (Err msg) ->
+            let
+                _ =
+                    Debug.log "Error" msg
+            in
+                ( model, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel, fetchRun runUrl )
+    ( initialModel, fetchRunIds )

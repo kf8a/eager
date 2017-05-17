@@ -72,6 +72,9 @@ type alias Model =
     , next_run : Maybe Run
     , status : Status
     , saving : Bool
+    , error : Maybe String
+    , previous_runs : List Run
+    , next_runs : List Run
     }
 
 
@@ -368,6 +371,25 @@ runResponseDecoder : Decoder Run
 runResponseDecoder =
     decode identity
         |> required "data" runDecoder
+
+
+runIdDecoder : Decoder Run
+runIdDecoder =
+    decode Run
+        |> required "id" JD.int
+        |> hardcoded ""
+        |> hardcoded []
+        |> hardcoded []
+        |> hardcoded []
+        |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
+        |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
+        |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
+
+
+runIdResponseDecoder : Decoder (List Run)
+runIdResponseDecoder =
+    decode identity
+        |> required "data" (JD.list runIdDecoder)
 
 
 decodeRun : String -> Run
