@@ -69,7 +69,6 @@ type alias Axis =
 
 type alias Model =
     { run : Run
-    , next_run : Maybe Run
     , status : Status
     , saving : Bool
     , error : Maybe String

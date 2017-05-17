@@ -28,6 +28,8 @@ type Msg
     | RunSaved (Result Http.Error ())
     | SaveRun
     | LoadRunIds (Result Http.Error (List Run))
+    | PrevRun
+    | NextRun
       -- | FluxGood Incubation
       -- | FluxMaybeGood Incubation
       -- | FluxBad Incubation
@@ -38,7 +40,6 @@ type Msg
 initialModel : Model
 initialModel =
     { run = initialRun
-    , next_run = Nothing
     , status = NotChecked
     , saving = False
     , error = Nothing
@@ -643,12 +644,39 @@ orderedIncubation a b =
 
 showSavingIndicator : Model -> Html Msg
 showSavingIndicator model =
-    case model.saving of
-        True ->
-            div [] [ Html.text "Saving run" ]
+    if model.saving then
+        div [] [ Html.text "Saving run" ]
+    else
+        div [] []
 
-        False ->
-            div [] []
+
+nextRunButton : Model -> Html Msg
+nextRunButton model =
+    if List.isEmpty model.next_runs then
+        button [ class "disabled" ]
+            [ Html.text "Next" ]
+    else
+        button [ onClick NextRun ]
+            [ Html.text "Next" ]
+
+
+prevRunButton : Model -> Html Msg
+prevRunButton model =
+    if List.isEmpty model.previous_runs then
+        button [ class "disabled" ]
+            [ Html.text "Prev" ]
+    else
+        button [ onClick PrevRun ]
+            [ Html.text "Prev" ]
+
+
+drawNextPrevRun : Model -> Html Msg
+drawNextPrevRun model =
+    div []
+        [ prevRunButton model
+        , Html.text (toString model.run.id)
+        , nextRunButton model
+        ]
 
 
 view : Model -> Html Msg
@@ -656,6 +684,7 @@ view model =
     div []
         [ button [ onClick SaveRun ]
             [ Html.text "Save" ]
+        , drawNextPrevRun model
         , showSavingIndicator model
         , div []
             [ draw_standards N2O model.run.n2o_calibration (n2o_standards model.run.standards)
@@ -711,19 +740,6 @@ fetchRun run =
 runSaved : Result Http.Error () -> Msg
 runSaved result =
     RunSaved result
-
-
-
--- case result of
---     Ok _ ->
---         RunSaved
---
---     Err msg ->
---         let
---             _ =
---                 Debug.log "ERROR" msg
---         in
---             NoOp
 
 
 saveUrl : Int -> String
@@ -993,7 +1009,6 @@ update msg model =
                 next_runs =
                     Maybe.withDefault [] (List.tail runs)
             in
-                -- TODO: fetch first run
                 ( { model | run = current_run, next_runs = next_runs }
                 , (fetchRun current_run)
                 )
@@ -1004,6 +1019,32 @@ update msg model =
                     Debug.log "Error" msg
             in
                 ( model, Cmd.none )
+
+        PrevRun ->
+            let
+                next_runs =
+                    model.run :: model.next_runs
+
+                run =
+                    Maybe.withDefault initialRun (List.head model.previous_runs)
+
+                previous_runs =
+                    Maybe.withDefault [] (List.tail model.previous_runs)
+            in
+                ( { model | run = run, previous_runs = previous_runs, next_runs = next_runs }, fetchRun run )
+
+        NextRun ->
+            let
+                previous_runs =
+                    model.run :: model.previous_runs
+
+                run =
+                    Maybe.withDefault initialRun (List.head model.next_runs)
+
+                next_runs =
+                    Maybe.withDefault [] (List.tail model.next_runs)
+            in
+                ( { model | run = run, previous_runs = previous_runs, next_runs = next_runs }, fetchRun run )
 
         NoOp ->
             ( model, Cmd.none )
