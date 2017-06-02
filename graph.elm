@@ -1,11 +1,12 @@
 module Graph exposing (..)
 
 import Date exposing (..)
+import Date.Extra as DE exposing (..)
 import Time exposing (..)
 import Html
 import Html exposing (..)
 import Html exposing (program, Html)
-import Html.Attributes as HA exposing (style)
+import Html.Attributes as HA exposing (style, href, target)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (..)
@@ -30,9 +31,9 @@ type Msg
     | LoadRunIds (Result Http.Error (List Run))
     | PrevRun
     | NextRun
-      -- | FluxGood Incubation
-      -- | FluxMaybeGood Incubation
-      -- | FluxBad Incubation
+    | FluxGood Incubation
+    | FluxMaybeGood Incubation
+    | FluxBad Incubation
       -- | SavedIncubation (Result Http.Error Incubation)
     | NoOp
 
@@ -630,10 +631,18 @@ renderList points =
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
     div []
-        [ span [] [ Html.text incubation.chamber ]
-        , draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)
-        , draw_injections CO2 incubation.co2_flux incubation (co2_injections incubation.injections)
-        , draw_injections CH4 incubation.ch4_flux incubation (ch4_injections incubation.injections)
+        [ div []
+            [ Html.text incubation.chamber
+            , Html.text " - "
+            , Html.text (DE.toFormattedString "MMMM ddd, y" incubation.sampled_at)
+            , Html.text " - "
+            , Html.text (toString incubation.id)
+            ]
+        , div []
+            [ draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)
+            , draw_injections CO2 incubation.co2_flux incubation (co2_injections incubation.injections)
+            , draw_injections CH4 incubation.ch4_flux incubation (ch4_injections incubation.injections)
+            ]
         ]
 
 
@@ -674,8 +683,25 @@ drawNextPrevRun : Model -> Html Msg
 drawNextPrevRun model =
     div []
         [ prevRunButton model
-        , Html.text (toString model.run.id)
+        , Html.a
+            [ HA.href
+                ("https://fluxprep.kbs.msu.edu/runs/"
+                    ++ (toString
+                            model.run.id
+                       )
+                )
+            , HA.target
+                "_blank"
+            ]
+            [ Html.text (toString model.run.id) ]
         , nextRunButton model
+        , Html.text model.run.setup_file
+        , button
+            [ onClick (FluxGood model.incubation) ]
+            [ Html.text "Good" ]
+        , button
+            [ onClick (FluxMaybeGood model.incubation) ]
+            [ Html.text "Maybe" ]
         ]
 
 
@@ -696,13 +722,6 @@ view model =
                 |> List.sortWith orderedIncubation
                 |> List.map renderIncubation
             )
-
-        -- , button
-        --     [ onClick (FluxGood model.incubation) ]
-        --     [ Html.text "Save" ]
-        -- , button
-        --     [ onClick (FluxMaybeGood model.incubation) ]
-        --     [ Html.text "Cancel" ]
         ]
 
 
@@ -929,26 +948,15 @@ update msg model =
         SwitchStandard NoGas point ->
             ( model, Cmd.none )
 
-        -- FluxGood incubation ->
-        --     let
-        --         new_model =
-        --             swapIncubation model
-        --     in
-        --         ( { new_model | status = Good }, fetchNextIncubation )
-        --
-        -- FluxMaybeGood incubation ->
-        --     let
-        --         new_model =
-        --             swapIncubation model
-        --     in
-        --         ( { new_model | status = MaybeGood }, fetchNextIncubation )
-        --
-        -- FluxBad incubation ->
-        --     let
-        --         new_model =
-        --             swapIncubation model
-        --     in
-        --         ( { new_model | status = Bad }, fetchNextIncubation )
+        FluxGood incubation ->
+            ( { model | status = Good }, Cmd.none )
+
+        FluxMaybeGood incubation ->
+            ( { model | status = MaybeGood }, Cmd.none )
+
+        FluxBad incubation ->
+            ( { model | status = Bad }, Cmd.none )
+
         -- SavedIncubation (Ok incubation) ->
         --     ( model, fetchNextIncubation )
         --

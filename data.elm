@@ -35,9 +35,9 @@ type alias Incubation =
     { injections : List Injection
     , id : Int
     , status : Status
+    , sampled_at : Date
     , chamber : String
     , height : Float
-    , wind : String
     , co2_flux : Maybe Flux
     , ch4_flux : Maybe Flux
     , n2o_flux : Maybe Flux
@@ -115,9 +115,9 @@ initialIncubation =
     { injections = []
     , id = 0
     , status = NotChecked
+    , sampled_at = DE.fromCalendarDate 1070 Jan 1
     , chamber = "NA"
     , height = 0
-    , wind = "NA"
     , co2_flux = Nothing
     , ch4_flux = Nothing
     , n2o_flux = Nothing
@@ -215,9 +215,9 @@ incubationDecoder =
         |> required "injections" (JD.list injectionDecoder)
         |> required "id" JD.int
         |> hardcoded NotChecked
+        |> required "sampled_at" date
         |> required "chamber" JD.string
         |> required "height" JD.float
-        |> required "wind" JD.string
         |> optional "co2_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_flux" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_flux" (JD.map Just fluxDecoder) Nothing
