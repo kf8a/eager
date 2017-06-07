@@ -624,17 +624,7 @@ dot xAxis yAxis msg point =
 
 toXAxis : List Point -> Axis
 toXAxis points =
-    let
-        _ =
-            Debug.log "points" points
-
-        _ =
-            Debug.log "minimum X" (minX points)
-
-        _ =
-            Debug.log "maximum X" (maxX points)
-    in
-        Axis 0 100 (minX points) (maxX points)
+    Axis 0 100 (minX points) (maxX points)
 
 
 toYAxis : List Point -> Axis
