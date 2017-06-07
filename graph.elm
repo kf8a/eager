@@ -29,6 +29,7 @@ type Msg
     | FluxGood Run
     | FluxMaybeGood Run
     | FluxBad Run
+    | DeleteAllPoints Incubation
       -- | SavedIncubation (Result Http.Error Incubation)
     | NoOp
 
@@ -95,6 +96,24 @@ axisTransform axis value =
         * (value
             - axis.min_value
           )
+
+
+deleteAllFromInjection : Injection -> Injection
+deleteAllFromInjection injection =
+    { injection
+        | co2_deleted = not injection.co2_deleted
+        , n2o_deleted = not injection.n2o_deleted
+        , ch4_deleted = not injection.ch4_deleted
+    }
+
+
+deleteAllPoints : Incubation -> Incubation
+deleteAllPoints incubation =
+    let
+        newInjections =
+            List.map deleteAllFromInjection incubation.injections
+    in
+        { incubation | injections = newInjections }
 
 
 update_point : Point -> List Point -> List Point
@@ -227,6 +246,24 @@ draw_injections gas flux incubation points =
         draw_graph my_dots (toString gas) points flux
 
 
+renderStandardValue : String -> Maybe Flux -> Svg Msg
+renderStandardValue label flux =
+    case flux of
+        Just flux ->
+            g []
+                [ text_ [ x "10", y "20" ] [ Svg.text label ]
+                , text_ [ x "10", y "40" ]
+                    [ Svg.text
+                        (Round.round 10
+                            flux.slope
+                        )
+                    ]
+                ]
+
+        Nothing ->
+            g [] []
+
+
 renderFluxEq : String -> Maybe Flux -> Svg Msg
 renderFluxEq label flux =
     case flux of
@@ -235,7 +272,7 @@ renderFluxEq label flux =
                 eq =
                     String.concat
                         [ "y = "
-                        , Round.round 2 flux.intercept
+                        , Round.round 4 flux.intercept
                         , " + "
                         , Round.round 4 flux.slope
                         , " x"
@@ -277,6 +314,7 @@ draw_standard_graph drawing_func label points flux =
                     [ drawXAxis xAxis yAxis
                     , drawYAxis xAxis yAxis
                     ]
+                , renderStandardValue label flux
                 , g []
                     drawing_func
                 ]
@@ -412,6 +450,15 @@ renderIncubation incubation =
             , Html.text (DE.toFormattedString "MMMM ddd, y" incubation.sampled_at)
             , Html.text " - "
             , Html.text (toString incubation.id)
+            , label []
+                [ input
+                    [ class "deletePoint"
+                    , type_ "checkbox"
+                    , onClick (DeleteAllPoints incubation)
+                    ]
+                    []
+                , Html.text "Bad Incubation"
+                ]
             ]
         , div []
             [ draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)
@@ -480,6 +527,17 @@ drawNextPrevRun model =
         ]
 
 
+renderError : Maybe String -> Html Msg
+renderError error =
+    case error of
+        Just msg ->
+            div [ class "error" ]
+                [ Html.text msg ]
+
+        Nothing ->
+            div [] []
+
+
 view : Model -> Html Msg
 view model =
     div []
@@ -492,6 +550,7 @@ view model =
             , draw_standards CO2 model.run.co2_calibration (co2_standards model.run.standards)
             , draw_standards CH4 model.run.ch4_calibration (ch4_standards model.run.standards)
             ]
+        , renderError model.error
         , div []
             (model.run.incubations
                 |> List.sortWith orderedIncubation
@@ -527,8 +586,12 @@ fetchRunIds =
 
 fetchRun : Run -> Cmd Msg
 fetchRun run =
-    Http.get (runUrl run.id) runResponseDecoder
-        |> Http.send LoadRun
+    let
+        _ =
+            Debug.log "fetching run" run.id
+    in
+        Http.get (runUrl run.id) runResponseDecoder
+            |> Http.send LoadRun
 
 
 runSaved : Result Http.Error () -> Msg
@@ -711,12 +774,12 @@ update msg model =
             in
                 ( { model | run = updatedRun }, Cmd.none )
 
-        LoadRun (Err msg) ->
+        LoadRun (Result.Err msg) ->
             let
                 _ =
-                    Debug.log "Error" msg
+                    Debug.log "ERROR " msg
             in
-                ( model, Cmd.none )
+                ( { model | error = (Just (toString msg)) }, Cmd.none )
 
         LoadRunIds (Ok runs) ->
             let
@@ -747,6 +810,8 @@ update msg model =
 
                 previous_runs =
                     Maybe.withDefault [] (List.tail model.previous_runs)
+
+                -- TODO: clean up older prev runs to reduce memory usage
             in
                 ( { model | run = run, previous_runs = previous_runs, next_runs = next_runs }, fetchRun run )
 
@@ -762,6 +827,25 @@ update msg model =
                     Maybe.withDefault [] (List.tail model.next_runs)
             in
                 ( { model | run = run, previous_runs = previous_runs, next_runs = next_runs }, fetchRun run )
+
+        DeleteAllPoints incubation ->
+            let
+                newIncubation =
+                    deleteAllPoints incubation
+
+                run =
+                    model.run
+
+                ( oldIncubation, rest ) =
+                    List.partition (\x -> x.id == incubation.id) run.incubations
+
+                newIncubationList =
+                    List.concat [ rest, [ newIncubation ] ]
+
+                newRun =
+                    { run | incubations = newIncubationList }
+            in
+                ( { model | run = newRun }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )

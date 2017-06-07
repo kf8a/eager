@@ -79,6 +79,9 @@ computeCO2Flux incubation =
 computeN2OFlux : Incubation -> Incubation
 computeN2OFlux incubation =
     let
+        _ =
+            Debug.log "computing N2O Flux" incubation
+
         new_flux =
             computeFlux N2O (n2o_injections incubation.injections)
     in
@@ -129,7 +132,10 @@ calibrateInjectionN2O : Flux -> Injection -> Injection
 calibrateInjectionN2O calibration injection =
     let
         n2o_ppm =
-            calibration.intercept + calibration.slope * injection.n2o_mv
+            calibration.slope * injection.n2o_mv
+
+        -- n2o_ppm =
+        --     calibration.intercept + calibration.slope * injection.n2o_mv
     in
         { injection | n2o_ppm = n2o_ppm }
 
@@ -229,7 +235,7 @@ calibrateRunCO2 run =
 
 computeCalibrationN2O : List Standard -> Flux
 computeCalibrationN2O standards =
-    averageCalibration N2O (n2o_standards standards) 0.4
+    averageCalibration N2O (n2o_standards standards) 0.3
 
 
 
@@ -257,12 +263,19 @@ computeCalibrationCO2 standards =
 updateCalibrationN2O : Run -> Point -> Run
 updateCalibrationN2O run point =
     let
-        updatedRun =
+        updatedStandardRun =
             updateRunStandard run (updateN2OStandards) point
+
+        updatedRun =
+            { updatedStandardRun
+                | n2o_calibration =
+                    Just
+                        (computeCalibrationN2O
+                            updatedStandardRun.standards
+                        )
+            }
     in
-        { updatedRun
-            | n2o_calibration = Just (computeCalibrationN2O updatedRun.standards)
-        }
+        updatedRun
             |> calibrateRunN2O
             |> computeN2OFluxes
 
@@ -293,9 +306,12 @@ averageCalibration : Gas -> List Point -> Float -> Flux
 averageCalibration gas points standard_value =
     let
         average_mv =
-            List.sum (List.map (\x -> x.y) points)
+            points
+                |> List.filter (\x -> not x.deleted)
+                |> List.map (\x -> x.y)
+                |> List.sum
 
         calibration_value =
-            average_mv / standard_value
+            standard_value / average_mv
     in
-        Flux 1 0 0 Nothing gas
+        Flux calibration_value 0 0 Nothing gas

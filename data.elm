@@ -223,10 +223,6 @@ ch4_injections injections =
         List.map (\x -> Point (pointInterval x.datetime) x.ch4_ppm x.ch4_deleted x.id) injections
 
 
-
--- Point extractors
-
-
 co2_standards : List Standard -> List Point
 co2_standards standards =
     List.map (\x -> Point (Date.toTime x.sampled_at) x.co2_ppm x.co2_deleted x.id) standards
@@ -332,11 +328,11 @@ injectionDecoder : Decoder Injection
 injectionDecoder =
     decode Injection
         |> hardcoded 0
-        |> hardcoded 0
-        |> hardcoded 0
-        |> required "co2" JD.float
         |> required "n2o" JD.float
         |> required "ch4" JD.float
+        |> required "co2" JD.float
+        |> required "n2o_mv" JD.float
+        |> required "ch4_mv" JD.float
         |> required "id" JD.int
         |> optional "co2_deleted" JD.bool False
         |> optional "n2o_deleted" JD.bool False
@@ -460,21 +456,19 @@ runIdResponseDecoder =
         |> required "data" (JD.list runIdDecoder)
 
 
-decodeRun : String -> Run
-decodeRun json =
-    case decodeString runResponseDecoder json of
-        Ok run ->
-            run
 
-        Err msg ->
-            let
-                _ =
-                    Debug.log "ERROR parsing run" msg
-            in
-                Run 0 "nothing" [] [] [] Nothing Nothing Nothing
-
-
-
+-- decodeRun : String -> Run
+-- decodeRun json =
+--     case decodeString runResponseDecoder json of
+--         Ok run ->
+--             run
+--
+--         Err msg ->
+--             let
+--                 _ =
+--                     Debug.log "ERROR parsing run" msg
+--             in
+--                 Run 0 "nothing" [] [] [] Nothing Nothing Nothing
 --- ENCODERS
 
 
