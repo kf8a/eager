@@ -19,6 +19,10 @@ type alias Flux =
     }
 
 
+type alias CalibrationValue =
+    { multiplier : Float }
+
+
 type alias Run =
     { id : Int
     , setup_file : String
@@ -157,9 +161,66 @@ initialStandards =
     [ initialStandard ]
 
 
+
+-- Translators
+
+
 sortedRecords : Injection -> Injection -> Order
 sortedRecords a b =
     DE.compare a.datetime b.datetime
+
+
+initialTime : List Injection -> Date
+initialTime injections =
+    let
+        sorted =
+            List.sortWith sortedRecords injections
+
+        firstRecord =
+            List.head sorted
+    in
+        case firstRecord of
+            Just injection ->
+                injection.datetime
+
+            Nothing ->
+                Date.fromTime (Time.inSeconds 0)
+
+
+interval : Date -> Date -> Float
+interval startTime time =
+    ((Date.toTime time) - Date.toTime (startTime)) / 1000 / 60
+
+
+
+-- Point extractors
+
+
+co2_injections : List Injection -> List Point
+co2_injections injections =
+    let
+        pointInterval =
+            interval (initialTime injections)
+    in
+        List.map (\x -> Point (pointInterval x.datetime) x.co2_ppm x.co2_deleted x.id) injections
+
+
+n2o_injections : List Injection -> List Point
+n2o_injections injections =
+    let
+        pointInterval =
+            interval (initialTime injections)
+    in
+        List.map (\x -> Point (pointInterval x.datetime) x.n2o_ppm x.n2o_deleted x.id) injections
+
+
+ch4_injections : List Injection -> List Point
+ch4_injections injections =
+    let
+        pointInterval =
+            interval (initialTime injections)
+    in
+        List.map (\x -> Point (pointInterval x.datetime) x.ch4_ppm x.ch4_deleted x.id) injections
 
 
 
@@ -174,6 +235,11 @@ co2_standards standards =
 n2o_standards : List Standard -> List Point
 n2o_standards standards =
     List.map (\x -> Point (Date.toTime x.sampled_at) x.n2o_mv x.n2o_deleted x.id) standards
+
+
+n2o_standard_values : List Standard -> List Point
+n2o_standard_values standards =
+    List.map (\x -> Point x.n2o_mv x.n2o_ppm x.n2o_deleted x.id) standards
 
 
 ch4_standards : List Standard -> List Point
@@ -518,7 +584,7 @@ runDetailEncoder run =
 updateN2OStandard : Standard -> Point -> Standard
 updateN2OStandard standard n2o =
     if n2o.id == standard.id then
-        { standard | n2o_ppm = n2o.y, n2o_mv = n2o.x, n2o_deleted = n2o.deleted }
+        { standard | n2o_deleted = n2o.deleted }
     else
         let
             -- TODO: Log this to the server side
@@ -534,7 +600,7 @@ updateN2OStandard standard n2o =
 updateCO2Standard : Standard -> Point -> Standard
 updateCO2Standard standard co2 =
     if co2.id == standard.id then
-        { standard | co2_ppm = co2.y, co2_mv = co2.x, co2_deleted = co2.deleted }
+        { standard | co2_deleted = co2.deleted }
     else
         let
             -- TODO: Log this to the server side
@@ -550,7 +616,7 @@ updateCO2Standard standard co2 =
 updateCH4Standard : Standard -> Point -> Standard
 updateCH4Standard standard ch4 =
     if ch4.id == standard.id then
-        { standard | ch4_ppm = ch4.y, ch4_mv = ch4.x, ch4_deleted = ch4.deleted }
+        { standard | ch4_deleted = ch4.deleted }
     else
         let
             -- TODO: Log this to the server side

@@ -1,8 +1,6 @@
 module Graph exposing (..)
 
-import Date exposing (..)
 import Date.Extra as DE exposing (..)
-import Time exposing (..)
 import Html
 import Html exposing (..)
 import Html exposing (program, Html)
@@ -14,11 +12,8 @@ import List.Extra as LE
 import Http
 import HttpBuilder exposing (..)
 import LeastSquares exposing (..)
+import Calibration exposing (..)
 import Round exposing (..)
-
-
--- import SampleIncubation exposing (json, nextJson)
-
 import Data exposing (..)
 
 
@@ -47,282 +42,6 @@ initialModel =
     , previous_runs = []
     , next_runs = []
     }
-
-
-
--- Point extractors
-
-
-co2_injections : List Injection -> List Point
-co2_injections injections =
-    let
-        pointInterval =
-            interval (initialTime injections)
-    in
-        List.map (\x -> Point (pointInterval x.datetime) x.co2_ppm x.co2_deleted x.id) injections
-
-
-n2o_injections : List Injection -> List Point
-n2o_injections injections =
-    let
-        pointInterval =
-            interval (initialTime injections)
-    in
-        List.map (\x -> Point (pointInterval x.datetime) x.n2o_ppm x.n2o_deleted x.id) injections
-
-
-ch4_injections : List Injection -> List Point
-ch4_injections injections =
-    let
-        pointInterval =
-            interval (initialTime injections)
-    in
-        List.map (\x -> Point (pointInterval x.datetime) x.ch4_ppm x.ch4_deleted x.id) injections
-
-
-
--- Translators
-
-
-initialTime : List Injection -> Date
-initialTime injections =
-    let
-        sorted =
-            List.sortWith sortedRecords injections
-
-        firstRecord =
-            List.head sorted
-    in
-        case firstRecord of
-            Just injection ->
-                injection.datetime
-
-            Nothing ->
-                Date.fromTime (Time.inSeconds 0)
-
-
-interval : Date -> Date -> Float
-interval startTime time =
-    ((Date.toTime time) - Date.toTime (startTime)) / 1000 / 60
-
-
-fluxWithDefault : Gas -> Result String Fit -> Flux
-fluxWithDefault gas fit =
-    case fit of
-        Ok fit ->
-            Flux fit.slope fit.intercept fit.r2 Nothing gas
-
-        Err message ->
-            initialFlux
-
-
-
---- Calibration
-
-
-calibrateInjectionN2O : Flux -> Injection -> Injection
-calibrateInjectionN2O calibration injection =
-    let
-        n2o_ppm =
-            calibration.intercept + calibration.slope * injection.n2o_mv
-    in
-        { injection | n2o_ppm = n2o_ppm }
-
-
-calibrateInjectionCH4 : Flux -> Injection -> Injection
-calibrateInjectionCH4 calibration injection =
-    let
-        ch4_ppm =
-            calibration.intercept + calibration.slope * injection.ch4_mv
-    in
-        { injection | ch4_ppm = ch4_ppm }
-
-
-calibrateInjectionCO2 : Flux -> Injection -> Injection
-calibrateInjectionCO2 calibration injection =
-    let
-        co2_ppm =
-            calibration.intercept + calibration.slope * injection.co2_mv
-    in
-        { injection | co2_ppm = co2_ppm }
-
-
-calibrateIncubationN2O : Flux -> Incubation -> Incubation
-calibrateIncubationN2O calibration incubation =
-    let
-        injections =
-            incubation.injections
-                |> List.map (calibrateInjectionN2O calibration)
-    in
-        { incubation | injections = injections }
-
-
-calibrateIncubationCH4 : Flux -> Incubation -> Incubation
-calibrateIncubationCH4 calibration incubation =
-    let
-        injections =
-            incubation.injections
-                |> List.map (calibrateInjectionCH4 calibration)
-    in
-        { incubation | injections = injections }
-
-
-calibrateIncubationCO2 : Flux -> Incubation -> Incubation
-calibrateIncubationCO2 calibration incubation =
-    let
-        injections =
-            incubation.injections
-                |> List.map (calibrateInjectionCO2 calibration)
-    in
-        { incubation | injections = injections }
-
-
-calibrateRunN2O : Run -> Run
-calibrateRunN2O run =
-    case run.n2o_calibration of
-        Just calibration ->
-            let
-                newIncubationList =
-                    run.incubations
-                        |> List.map (calibrateIncubationN2O calibration)
-            in
-                { run | incubations = newIncubationList }
-
-        Nothing ->
-            run
-
-
-calibrateRunCH4 : Run -> Run
-calibrateRunCH4 run =
-    case run.ch4_calibration of
-        Just calibration ->
-            let
-                newIncubationList =
-                    run.incubations
-                        |> List.map (calibrateIncubationCH4 calibration)
-            in
-                { run | incubations = newIncubationList }
-
-        Nothing ->
-            run
-
-
-calibrateRunCO2 : Run -> Run
-calibrateRunCO2 run =
-    case run.co2_calibration of
-        Just calibration ->
-            let
-                newIncubationList =
-                    run.incubations
-                        |> List.map (calibrateIncubationCO2 calibration)
-            in
-                { run | incubations = newIncubationList }
-
-        Nothing ->
-            run
-
-
-computeCalibrationN2O : List Standard -> Flux
-computeCalibrationN2O standards =
-    averageCalibration N2O (n2o_standards standards)
-
-
-
--- computeFlux N2O (n2o_standards standards)
-
-
-computeCalibrationCH4 : List Standard -> Flux
-computeCalibrationCH4 standards =
-    averageCalibration CH4 (ch4_standards standards)
-
-
-
--- computeFlux CH4 (ch4_standards standards)
-
-
-computeCalibrationCO2 : List Standard -> Flux
-computeCalibrationCO2 standards =
-    averageCalibration CO2 (co2_standards standards)
-
-
-
--- computeFlux CO2 (co2_standards standards)
-
-
-updateCalibrationN2O : Run -> Point -> Run
-updateCalibrationN2O run point =
-    let
-        updatedRun =
-            updateRunStandard run (updateN2OStandards) point
-    in
-        { updatedRun
-            | n2o_calibration = Just (computeCalibrationN2O updatedRun.standards)
-        }
-            |> calibrateRunN2O
-            |> computeN2OFluxes
-
-
-updateCalibrationCH4 : Run -> Point -> Run
-updateCalibrationCH4 run point =
-    let
-        updatedRun =
-            updateRunStandard run (updateCH4Standards) point
-    in
-        { updatedRun | ch4_calibration = Just (computeCalibrationCH4 updatedRun.standards) }
-            |> calibrateRunCH4
-            |> computeCH4Fluxes
-
-
-updateCalibrationCO2 : Run -> Point -> Run
-updateCalibrationCO2 run point =
-    let
-        updatedRun =
-            updateRunStandard run (updateCO2Standards) point
-    in
-        { updatedRun | co2_calibration = Just (computeCalibrationCO2 updatedRun.standards) }
-            |> calibrateRunCO2
-            |> computeCO2Fluxes
-
-
-averageCalibration : Gas -> List Point -> Flux
-averageCalibration gas points =
-    Flux 0 1 0 Nothing gas
-
-
-
---- Compute Fluxes
-
-
-computeFlux : Gas -> List Point -> Flux
-computeFlux gas points =
-    points
-        |> fitLineByLeastSquares
-        |> fluxWithDefault gas
-
-
-computeIncubationFluxes : Incubation -> Incubation
-computeIncubationFluxes incubation =
-    let
-        n2o_flux =
-            incubation.injections
-                |> n2o_injections
-                |> computeFlux N2O
-
-        co2_flux =
-            incubation.injections
-                |> co2_injections
-                |> computeFlux CO2
-
-        ch4_flux =
-            incubation.injections
-                |> ch4_injections
-                |> computeFlux CH4
-    in
-        { incubation
-            | n2o_flux = Just n2o_flux
-            , ch4_flux = Just ch4_flux
-            , co2_flux = Just co2_flux
-        }
 
 
 
@@ -376,16 +95,6 @@ axisTransform axis value =
         * (value
             - axis.min_value
           )
-
-
-pointColor : Bool -> String
-pointColor deleted =
-    case deleted of
-        True ->
-            "grey"
-
-        False ->
-            "blue"
 
 
 update_point : Point -> List Point -> List Point
@@ -452,7 +161,7 @@ drawXAxis xAxis yAxis =
         , y1 (toString yAxis.max_extent)
         , y2 (toString yAxis.max_extent)
         , stroke "black"
-        , fill "black"
+        , class "xAxis"
         ]
         []
 
@@ -465,7 +174,7 @@ drawYAxis xAxis yAxis =
         , y1 (toString yAxis.min_extent)
         , y2 (toString yAxis.max_extent)
         , stroke "black"
-        , fill "black"
+        , class "yAxis"
         ]
         []
 
@@ -492,7 +201,7 @@ drawRegressionLine xAxis yAxis flux =
                             )
                         )
                     , stroke "black"
-                    , fill "black"
+                    , class "regressionLine"
                     ]
                     []
 
@@ -506,7 +215,7 @@ draw_standards gas flux points =
         my_dots =
             standardDots gas points
     in
-        draw_graph my_dots (toString gas) points flux
+        draw_standard_graph my_dots (toString gas) points flux
 
 
 draw_injections : Gas -> Maybe Flux -> Incubation -> List Point -> Svg Msg
@@ -548,6 +257,32 @@ renderFluxEq label flux =
             g [] []
 
 
+draw_standard_graph : List (Svg Msg) -> String -> List Point -> Maybe Flux -> Svg Msg
+draw_standard_graph drawing_func label points flux =
+    let
+        xAxis =
+            toXAxis points
+
+        yAxis =
+            toYAxis points
+    in
+        svg
+            [ width (toString (xAxis.max_extent + x_offset + 50))
+            , height (toString (yAxis.max_extent + y_offset + 50))
+
+            -- , viewBox (viewBox_ xAxis yAxis)
+            ]
+            [ g [ transform translateCoords ]
+                [ g []
+                    [ drawXAxis xAxis yAxis
+                    , drawYAxis xAxis yAxis
+                    ]
+                , g []
+                    drawing_func
+                ]
+            ]
+
+
 draw_graph : List (Svg Msg) -> String -> List Point -> Maybe Flux -> Svg Msg
 draw_graph drawing_func label points flux =
     let
@@ -579,9 +314,6 @@ draw_graph drawing_func label points flux =
 dot : Axis -> Axis -> Msg -> Point -> Svg Msg
 dot xAxis yAxis msg point =
     let
-        color =
-            pointColor point.deleted
-
         xAxis_transform =
             axisTransform xAxis
 
@@ -594,8 +326,8 @@ dot xAxis yAxis msg point =
                     [ cx (toString (xAxis_transform point.x))
                     , cy (toString (yAxis.max_extent - yAxis_transform point.y))
                     , r "5"
-                    , stroke color
-                    , fill color
+                    , stroke "blue"
+                    , fill "blue"
                     , onClick msg
                     ]
                     []
@@ -606,7 +338,8 @@ dot xAxis yAxis msg point =
                         [ cx (toString (xAxis_transform point.x))
                         , cy (toString (yAxis.max_extent - yAxis_transform point.y))
                         , r "5"
-                        , stroke color
+                        , stroke "grey"
+                        , class "deleted"
                         , fill "none"
                         ]
                         []
@@ -614,8 +347,9 @@ dot xAxis yAxis msg point =
                         [ cx (toString (xAxis.max_extent + 20))
                         , cy (toString (yAxis.max_extent - yAxis_transform point.y))
                         , r "5"
-                        , stroke color
-                        , fill color
+                        , stroke "grey"
+                        , fill "grey"
+                        , class "deleted"
                         , onClick msg
                         ]
                         []
@@ -833,80 +567,14 @@ updateIncubation incubation updater point =
 --- TODO: move flux updating here by passing in the extractor
 
 
-updateRunStandard : Run -> (List Standard -> Point -> List Standard) -> Point -> Run
-updateRunStandard run updater point =
-    let
-        new_point =
-            { point | deleted = not point.deleted }
-
-        new_standards =
-            updater run.standards new_point
-
-        new_run =
-            { run | standards = new_standards }
-    in
-        new_run
-
-
-computeCO2Flux : Incubation -> Incubation
-computeCO2Flux incubation =
-    let
-        new_flux =
-            computeFlux CO2 (co2_injections incubation.injections)
-    in
-        { incubation | co2_flux = Just new_flux }
-
-
-computeN2OFlux : Incubation -> Incubation
-computeN2OFlux incubation =
-    let
-        new_flux =
-            computeFlux N2O (n2o_injections incubation.injections)
-    in
-        { incubation | n2o_flux = Just new_flux }
-
-
-computeCH4Flux : Incubation -> Incubation
-computeCH4Flux incubation =
-    let
-        new_flux =
-            computeFlux CH4 (ch4_injections incubation.injections)
-    in
-        { incubation | ch4_flux = Just new_flux }
-
-
-computeN2OFluxes : Run -> Run
-computeN2OFluxes run =
-    let
-        incubations =
-            List.map computeN2OFlux run.incubations
-    in
-        { run | incubations = incubations }
-
-
-computeCO2Fluxes : Run -> Run
-computeCO2Fluxes run =
-    let
-        incubations =
-            List.map computeCO2Flux run.incubations
-    in
-        { run | incubations = incubations }
-
-
-computeCH4Fluxes : Run -> Run
-computeCH4Fluxes run =
-    let
-        incubations =
-            List.map computeCH4Flux run.incubations
-    in
-        { run | incubations = incubations }
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SwitchInjection CO2 incubation point ->
             let
+                _ =
+                    Debug.log "switching CO2" incubation
+
                 updated_incubation =
                     updateIncubation incubation (update_co2_injections) point
 
