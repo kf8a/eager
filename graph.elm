@@ -31,9 +31,9 @@ type Msg
     | LoadRunIds (Result Http.Error (List Run))
     | PrevRun
     | NextRun
-    | FluxGood Incubation
-    | FluxMaybeGood Incubation
-    | FluxBad Incubation
+    | FluxGood Run
+    | FluxMaybeGood Run
+    | FluxBad Run
       -- | SavedIncubation (Result Http.Error Incubation)
     | NoOp
 
@@ -224,17 +224,29 @@ calibrateRunCO2 run =
 
 computeCalibrationN2O : List Standard -> Flux
 computeCalibrationN2O standards =
-    computeFlux N2O (n2o_standards standards)
+    averageCalibration N2O (n2o_standards standards)
+
+
+
+-- computeFlux N2O (n2o_standards standards)
 
 
 computeCalibrationCH4 : List Standard -> Flux
 computeCalibrationCH4 standards =
-    computeFlux CH4 (ch4_standards standards)
+    averageCalibration CH4 (ch4_standards standards)
+
+
+
+-- computeFlux CH4 (ch4_standards standards)
 
 
 computeCalibrationCO2 : List Standard -> Flux
 computeCalibrationCO2 standards =
-    computeFlux CO2 (co2_standards standards)
+    averageCalibration CO2 (co2_standards standards)
+
+
+
+-- computeFlux CO2 (co2_standards standards)
 
 
 updateCalibrationN2O : Run -> Point -> Run
@@ -270,6 +282,11 @@ updateCalibrationCO2 run point =
         { updatedRun | co2_calibration = Just (computeCalibrationCO2 updatedRun.standards) }
             |> calibrateRunCO2
             |> computeCO2Fluxes
+
+
+averageCalibration : Gas -> List Point -> Flux
+averageCalibration gas points =
+    Flux 0 1 0 Nothing gas
 
 
 
@@ -322,6 +339,16 @@ maxY points =
             120
 
 
+minY : List Point -> Float
+minY points =
+    case LE.minimumBy .y points of
+        Just point ->
+            point.y
+
+        Nothing ->
+            0
+
+
 maxX : List Point -> Float
 maxX points =
     case LE.maximumBy .x points of
@@ -332,9 +359,23 @@ maxX points =
             120
 
 
+minX : List Point -> Float
+minX points =
+    case LE.minimumBy .x points of
+        Just point ->
+            point.x
+
+        Nothing ->
+            0
+
+
 axisTransform : Axis -> Float -> Float
 axisTransform axis value =
-    (axis.max_extent / (axis.max_value - axis.min_value) * value)
+    axis.max_extent
+        / (axis.max_value - axis.min_value)
+        * (value
+            - axis.min_value
+          )
 
 
 pointColor : Bool -> String
@@ -583,7 +624,17 @@ dot xAxis yAxis msg point =
 
 toXAxis : List Point -> Axis
 toXAxis points =
-    Axis 0 100 0 (maxX points)
+    let
+        _ =
+            Debug.log "points" points
+
+        _ =
+            Debug.log "minimum X" (minX points)
+
+        _ =
+            Debug.log "maximum X" (maxX points)
+    in
+        Axis 0 100 (minX points) (maxX points)
 
 
 toYAxis : List Point -> Axis
@@ -697,10 +748,10 @@ drawNextPrevRun model =
         , nextRunButton model
         , Html.text model.run.setup_file
         , button
-            [ onClick (FluxGood model.incubation) ]
+            [ onClick (FluxGood model.run) ]
             [ Html.text "Good" ]
         , button
-            [ onClick (FluxMaybeGood model.incubation) ]
+            [ onClick (FluxMaybeGood model.run) ]
             [ Html.text "Maybe" ]
         ]
 

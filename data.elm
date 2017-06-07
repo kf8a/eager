@@ -56,6 +56,7 @@ type alias Standard =
     , co2_deleted : Bool
     , ch4_deleted : Bool
     , id : Int
+    , sampled_at : Date
     }
 
 
@@ -142,6 +143,7 @@ initialStandard =
     , co2_deleted = False
     , ch4_deleted = False
     , id = 0
+    , sampled_at = DE.fromCalendarDate 1070 Jan 1
     }
 
 
@@ -166,17 +168,17 @@ sortedRecords a b =
 
 co2_standards : List Standard -> List Point
 co2_standards standards =
-    List.map (\x -> Point x.co2_mv x.co2_ppm x.co2_deleted x.id) standards
+    List.map (\x -> Point (Date.toTime x.sampled_at) x.co2_ppm x.co2_deleted x.id) standards
 
 
 n2o_standards : List Standard -> List Point
 n2o_standards standards =
-    List.map (\x -> Point x.n2o_mv x.n2o_ppm x.n2o_deleted x.id) standards
+    List.map (\x -> Point (Date.toTime x.sampled_at) x.n2o_mv x.n2o_deleted x.id) standards
 
 
 ch4_standards : List Standard -> List Point
 ch4_standards standards =
-    List.map (\x -> Point x.ch4_mv x.ch4_ppm x.ch4_deleted x.id) standards
+    List.map (\x -> Point (Date.toTime x.sampled_at) x.ch4_mv x.ch4_deleted x.id) standards
         |> List.filter (\x -> x.y /= 0.0)
 
 
@@ -339,6 +341,7 @@ standardDecoder =
         |> required "co2_deleted" JD.bool
         |> required "ch4_deleted" JD.bool
         |> required "id" JD.int
+        |> required "sampled_at" date
 
 
 standardDataDecoder : Decoder (List Standard)
