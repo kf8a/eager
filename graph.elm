@@ -427,10 +427,6 @@ renderList points =
         (List.map (\x -> renderListElement x) points)
 
 
-
--- TODO: Link to fluxprep incubation
-
-
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
     span [ HA.style [ ( "display", "inline-block" ) ] ]
@@ -438,7 +434,14 @@ renderIncubation incubation =
             [ Html.text "Chamber "
             , Html.text incubation.chamber
             , Html.text " - "
-            , Html.text (DE.toFormattedString "MMMM ddd, y HH:MM" incubation.sampled_at)
+            , Html.a
+                [ href
+                    ("https://fluxprep.kbs.msu.edu/incubations/"
+                        ++ (toString incubation.id)
+                    )
+                ]
+                [ Html.text (DE.toFormattedString "MMMM ddd, y HH:MM" incubation.sampled_at)
+                ]
             , Html.text " - "
             , button [ onClick (DeleteAllPoints incubation) ] [ Html.text "Delete" ]
             ]
