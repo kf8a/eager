@@ -461,7 +461,7 @@ orderedIncubation a b =
 showSavingIndicator : Model -> Html Msg
 showSavingIndicator model =
     if model.saving then
-        div [] [ Html.text "Saving run" ]
+        div [ class "alert alert-info" ] [ Html.text "Saving run" ]
     else
         div [] []
 
@@ -519,7 +519,7 @@ renderError : Maybe String -> Html Msg
 renderError error =
     case error of
         Just msg ->
-            div [ class "error" ]
+            div [ class "alert-warning" ]
                 [ Html.text msg ]
 
         Nothing ->
@@ -531,6 +531,7 @@ view model =
     div []
         [ drawNextPrevRun model
         , showSavingIndicator model
+        , div [ class "text-right" ] [ Html.text (toString model.run.status) ]
         , div []
             [ draw_standards N2O model.run.n2o_calibration (n2o_standards model.run.standards)
             , draw_standards CO2 model.run.co2_calibration (co2_standards model.run.standards)

@@ -530,6 +530,22 @@ gasEncoder gas =
             JE.string "no_gas"
 
 
+statusEncoder : Status -> JE.Value
+statusEncoder status =
+    case status of
+        Good ->
+            JE.string "good"
+
+        Bad ->
+            JE.string "bad"
+
+        MaybeGood ->
+            JE.string "maybe"
+
+        NotChecked ->
+            JE.null
+
+
 fluxEncoder : Flux -> JE.Value
 fluxEncoder flux =
     JE.object
@@ -563,6 +579,7 @@ runDetailEncoder run =
         --         , JEE.maybe fluxEncoder run.ch4_calibration
         --         ]
         --   )
+        , ( "status", statusEncoder run.status )
         ]
 
 
