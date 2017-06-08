@@ -258,22 +258,18 @@ calibrateRunCO2 run =
             run
 
 
+
+-- TODO: get calibration values from tank
+
+
 computeCalibrationN2O : List Standard -> Flux
 computeCalibrationN2O standards =
     averageCalibration N2O (n2o_standards standards) 0.3
 
 
-
--- computeFlux N2O (n2o_standards standards)
-
-
 computeCalibrationCH4 : List Standard -> Flux
 computeCalibrationCH4 standards =
     averageCalibration CH4 (ch4_standards standards) 4.0
-
-
-
--- computeFlux CH4 (ch4_standards standards)
 
 
 computeCalibrationCO2 : List Standard -> Flux
@@ -283,10 +279,6 @@ computeCalibrationCO2 standards =
             Debug.log "computing calibration with"
     in
         averageCalibration CO2 (co2_standards standards) 700
-
-
-
--- computeFlux CO2 (co2_standards standards)
 
 
 updateCalibrationN2O : Run -> Point -> Run
