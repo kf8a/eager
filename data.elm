@@ -352,32 +352,33 @@ injectionDataDecoder =
         |> required "data" injectionDecoder
 
 
-decodeInjection : String -> Injection
-decodeInjection json =
-    case decodeString injectionDataDecoder json of
-        Ok injection ->
-            injection
 
-        Err msg ->
-            let
-                date =
-                    Date.fromTime (Time.inSeconds 0)
-            in
-                Injection 0 0 0 0 0 0 0 False False False date
-
-
-decodeInjections : String -> List Injection
-decodeInjections json =
-    case decodeString responseDecoder json of
-        Ok listOfInjections ->
-            listOfInjections
-
-        Err msg ->
-            let
-                _ =
-                    Debug.log "ERROR decoding injections:" msg
-            in
-                []
+-- decodeInjection : String -> Injection
+-- decodeInjection json =
+--     case decodeString injectionDataDecoder json of
+--         Ok injection ->
+--             injection
+--
+--         Err msg ->
+--             let
+--                 date =
+--                     Date.fromTime (Time.inSeconds 0)
+--             in
+--                 Injection 0 0 0 0 0 0 0 False False False date
+--
+--
+-- decodeInjections : String -> List Injection
+-- decodeInjections json =
+--     case decodeString responseDecoder json of
+--         Ok listOfInjections ->
+--             listOfInjections
+--
+--         Err msg ->
+--             let
+--                 _ =
+--                     Debug.log "ERROR decoding injections:" msg
+--             in
+--                 []
 
 
 decodeStandards : String -> List Standard
@@ -429,11 +430,28 @@ runDecoder =
         |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
-        |> hardcoded NotChecked
+        |> optional "status" statusDecoder NotChecked
 
 
+statusDecoder : Decoder Status
+statusDecoder =
+    let
+        convert : String -> Decoder Status
+        convert raw =
+            case raw of
+                "good" ->
+                    succeed Good
 
--- TODO: read the status from the supplied data instead of hardcoding
+                "bad" ->
+                    succeed Bad
+
+                "maybe" ->
+                    succeed MaybeGood
+
+                _ ->
+                    fail "unparsable status"
+    in
+        JD.string |> andThen convert
 
 
 runResponseDecoder : Decoder Run

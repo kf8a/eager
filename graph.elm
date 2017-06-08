@@ -778,7 +778,7 @@ update msg model =
                 newModel =
                     nextRun model
             in
-                ( newModel, fetchNextRun newModel )
+                ( { newModel | saving = False }, fetchNextRun newModel )
 
         RunSaved (Err msg) ->
             ( model, Cmd.none )
