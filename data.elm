@@ -32,6 +32,7 @@ type alias Run =
     , co2_calibration : Maybe Flux
     , ch4_calibration : Maybe Flux
     , n2o_calibration : Maybe Flux
+    , status : Status
     }
 
 
@@ -74,7 +75,6 @@ type alias Axis =
 
 type alias Model =
     { run : Run
-    , status : Status
     , saving : Bool
     , error : Maybe String
     , previous_runs : List Run
@@ -132,7 +132,7 @@ initialIncubation =
 
 initialRun : Run
 initialRun =
-    Run 0 "nothing" [] [] [] Nothing Nothing Nothing
+    Run 0 "nothing" [] [] [] Nothing Nothing Nothing NotChecked
 
 
 initialStandard : Standard
@@ -429,6 +429,11 @@ runDecoder =
         |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
+        |> hardcoded NotChecked
+
+
+
+-- TODO: read the status from the supplied data instead of hardcoding
 
 
 runResponseDecoder : Decoder Run
@@ -448,6 +453,7 @@ runIdDecoder =
         |> optional "co2_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "ch4_calibration" (JD.map Just fluxDecoder) Nothing
         |> optional "n2o_calibration" (JD.map Just fluxDecoder) Nothing
+        |> hardcoded NotChecked
 
 
 runIdResponseDecoder : Decoder (List Run)

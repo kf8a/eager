@@ -21,8 +21,8 @@ type Msg
     = SwitchInjection Gas Incubation Point
     | SwitchStandard Gas Point
     | LoadRun (Result Http.Error Run)
+    | PreLoadRun (Result Http.Error Run)
     | RunSaved (Result Http.Error ())
-    | SaveRun
     | LoadRunIds (Result Http.Error (List Run))
     | PrevRun
     | NextRun
@@ -37,7 +37,6 @@ type Msg
 initialModel : Model
 initialModel =
     { run = initialRun
-    , status = NotChecked
     , saving = False
     , error = Nothing
     , previous_runs = []
@@ -443,13 +442,13 @@ renderList points =
 
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
-    div []
+    span [ HA.style [ ( "display", "inline-block" ) ] ]
         [ div []
-            [ Html.text incubation.chamber
+            [ Html.text "Chamber "
+            , Html.text incubation.chamber
             , Html.text " - "
-            , Html.text (DE.toFormattedString "MMMM ddd, y" incubation.sampled_at)
+            , Html.text (DE.toFormattedString "MMMM ddd, y HH:MM" incubation.sampled_at)
             , Html.text " - "
-            , Html.text (toString incubation.id)
             , label []
                 [ input
                     [ class "deletePoint"
@@ -524,6 +523,9 @@ drawNextPrevRun model =
         , button
             [ onClick (FluxMaybeGood model.run) ]
             [ Html.text "Maybe" ]
+        , button
+            [ onClick (FluxBad model.run) ]
+            [ Html.text "Bad" ]
         ]
 
 
@@ -541,9 +543,7 @@ renderError error =
 view : Model -> Html Msg
 view model =
     div []
-        [ button [ onClick SaveRun ]
-            [ Html.text "Save" ]
-        , drawNextPrevRun model
+        [ drawNextPrevRun model
         , showSavingIndicator model
         , div []
             [ draw_standards N2O model.run.n2o_calibration (n2o_standards model.run.standards)
@@ -594,6 +594,21 @@ fetchRun run =
             |> Http.send LoadRun
 
 
+fetchNextRun : Model -> Cmd Msg
+fetchNextRun model =
+    let
+        run =
+            List.head model.next_runs
+    in
+        case run of
+            Just run ->
+                Http.get (runUrl run.id) runResponseDecoder
+                    |> Http.send PreLoadRun
+
+            Nothing ->
+                Cmd.none
+
+
 runSaved : Result Http.Error () -> Msg
 runSaved result =
     RunSaved result
@@ -609,6 +624,25 @@ saveRun run =
     HttpBuilder.put (saveUrl run.id)
         |> withJsonBody (runEncoder run)
         |> send runSaved
+
+
+nextRun : Model -> Model
+nextRun model =
+    let
+        previous_runs =
+            model.run :: model.previous_runs
+
+        run =
+            Maybe.withDefault initialRun (List.head model.next_runs)
+
+        next_runs =
+            Maybe.withDefault [] (List.tail model.next_runs)
+    in
+        { model
+            | run = run
+            , previous_runs = previous_runs
+            , next_runs = next_runs
+        }
 
 
 updateIncubation : Incubation -> (List Injection -> Point -> List Injection) -> Point -> Incubation
@@ -720,66 +754,80 @@ update msg model =
         SwitchStandard NoGas point ->
             ( model, Cmd.none )
 
-        FluxGood incubation ->
-            ( { model | status = Good }, Cmd.none )
+        -- TODO: see if the FluxGood/Bad/Maybe can be collapsed by passing the
+        -- msg
+        FluxGood run ->
+            let
+                newRun =
+                    { run | status = Good }
 
-        FluxMaybeGood incubation ->
-            ( { model | status = MaybeGood }, Cmd.none )
+                newModel =
+                    { model | run = newRun }
+            in
+                ( { newModel | saving = True }, saveRun newModel.run )
 
-        FluxBad incubation ->
-            ( { model | status = Bad }, Cmd.none )
+        FluxMaybeGood run ->
+            let
+                newRun =
+                    { run | status = MaybeGood }
 
-        -- SavedIncubation (Ok incubation) ->
-        --     ( model, fetchNextIncubation )
-        --
-        -- SavedIncubation (Err msg) ->
-        --     let
-        --         _ =
-        --             Debug.log "error Saving" msg
-        --     in
-        --         --- TODO: need to alert the user that something failed
-        --         ( model, Cmd.none )
+                newModel =
+                    { model | run = newRun }
+            in
+                ( { newModel | saving = True }, saveRun newModel.run )
+
+        FluxBad run ->
+            let
+                newRun =
+                    { run | status = Bad }
+
+                newModel =
+                    { model | run = newRun }
+            in
+                ( { newModel | saving = True }, saveRun newModel.run )
+
         RunSaved (Ok run) ->
             ( { model | saving = False }, Cmd.none )
 
         RunSaved (Err msg) ->
             ( model, Cmd.none )
 
-        SaveRun ->
-            ( { model | saving = True }, saveRun model.run )
-
         LoadRun (Ok run) ->
             let
-                co2_cal =
-                    computeCalibrationCO2 run.standards
-
-                ch4_cal =
-                    computeCalibrationCH4 run.standards
-
-                n2o_cal =
-                    computeCalibrationN2O run.standards
-
-                newRun =
-                    { run
-                        | co2_calibration = Just co2_cal
-                        , ch4_calibration = Just ch4_cal
-                        , n2o_calibration = Just n2o_cal
-                    }
-                        |> calibrateRunCO2
-                        |> calibrateRunCH4
-                        |> calibrateRunN2O
-
                 updatedRun =
-                    { newRun | incubations = List.map computeIncubationFluxes newRun.incubations }
+                    calibrateRun run
             in
-                ( { model | run = updatedRun }, Cmd.none )
+                ( { model | run = updatedRun }, fetchNextRun model )
 
-        LoadRun (Result.Err msg) ->
+        LoadRun (Err msg) ->
             let
                 _ =
                     Debug.log "ERROR " msg
             in
                 ( { model | error = (Just (toString msg)) }, Cmd.none )
+
+        PreLoadRun (Ok run) ->
+            let
+                _ =
+                    Debug.log "preloaded" run.id
+
+                tail =
+                    Maybe.withDefault [] (List.tail model.next_runs)
+
+                updatedRun =
+                    calibrateRun run
+
+                newRuns =
+                    [ updatedRun ] ++ tail
+            in
+                ( { model | next_runs = newRuns }, Cmd.none )
+
+        PreLoadRun (Err msg) ->
+            let
+                _ =
+                    Debug.log "Error" msg
+            in
+                ( model, Cmd.none )
 
         LoadRunIds (Ok runs) ->
             let
@@ -817,16 +865,10 @@ update msg model =
 
         NextRun ->
             let
-                previous_runs =
-                    model.run :: model.previous_runs
-
-                run =
-                    Maybe.withDefault initialRun (List.head model.next_runs)
-
-                next_runs =
-                    Maybe.withDefault [] (List.tail model.next_runs)
+                newModel =
+                    nextRun model
             in
-                ( { model | run = run, previous_runs = previous_runs, next_runs = next_runs }, fetchRun run )
+                ( newModel, fetchNextRun newModel )
 
         DeleteAllPoints incubation ->
             let

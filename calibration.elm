@@ -188,6 +188,31 @@ calibrateIncubationCO2 calibration incubation =
         { incubation | injections = injections }
 
 
+calibrateRun : Run -> Run
+calibrateRun run =
+    let
+        co2_cal =
+            computeCalibrationCO2 run.standards
+
+        ch4_cal =
+            computeCalibrationCH4 run.standards
+
+        n2o_cal =
+            computeCalibrationN2O run.standards
+
+        newRun =
+            { run
+                | co2_calibration = Just co2_cal
+                , ch4_calibration = Just ch4_cal
+                , n2o_calibration = Just n2o_cal
+            }
+                |> calibrateRunCO2
+                |> calibrateRunCH4
+                |> calibrateRunN2O
+    in
+        { newRun | incubations = List.map computeIncubationFluxes newRun.incubations }
+
+
 calibrateRunN2O : Run -> Run
 calibrateRunN2O run =
     case run.n2o_calibration of
