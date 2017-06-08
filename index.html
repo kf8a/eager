@@ -1,0 +1,20 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>flux</title>
+  <script type="text/javascript" src="./elm.js"></script>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+</head>
+<body>
+<div id="main" class="container"></div>
+</body>
+  <script type="text/javascript">
+    var node = document.getElementById('main');
+    var app = Elm.Main.embed(node);
+    // Note: if your Elm module is named "MyThing.Root" you
+    // would call "Elm.MyThing.Root.embed(node)" instead.
+  </script>
+</html>
