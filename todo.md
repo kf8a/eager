@@ -1,9 +1,12 @@
-= Tdod
+= TODO
 
-- create new database structure from migration
-- reload data  into new structure.
+- authentication
+- save the notes
+- add axis labels
 - decide where to show millivolts
 - get calibration values from tank
-- check that id's get preserved on save
-- take chamber height into account
+- include chamber height from deployments
 
+Later
+- create new database structure from migration
+- reload data  into new structure.

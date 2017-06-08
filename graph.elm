@@ -443,6 +443,7 @@ renderIncubation incubation =
                 [ Html.text (DE.toFormattedString "MMMM ddd, y HH:MM" incubation.sampled_at)
                 ]
             , Html.text " - "
+            , Html.text "mv -"
             , button [ onClick (DeleteAllPoints incubation) ] [ Html.text "Delete" ]
             ]
         , div []
@@ -532,6 +533,7 @@ view model =
         [ drawNextPrevRun model
         , showSavingIndicator model
         , div [ class "text-right" ] [ Html.text (toString model.run.status) ]
+        , Html.textarea [ HA.cols 40 ] []
         , div []
             [ draw_standards N2O model.run.n2o_calibration (n2o_standards model.run.standards)
             , draw_standards CO2 model.run.co2_calibration (co2_standards model.run.standards)
