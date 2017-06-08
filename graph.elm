@@ -127,19 +127,6 @@ update_point point incubation =
         old_list ++ [ new_point ]
 
 
-
--- swapIncubation : Model -> Model
--- swapIncubation model =
---     let
---         inc =
---             model.next_incubation
---     in
---         { model
---             | next_incubation = model.incubation
---             , incubation = inc
---         }
-
-
 x_offset : Float
 x_offset =
     30.0
@@ -440,6 +427,10 @@ renderList points =
         (List.map (\x -> renderListElement x) points)
 
 
+
+-- TODO: Link to fluxprep incubation
+
+
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
     span [ HA.style [ ( "display", "inline-block" ) ] ]
@@ -449,15 +440,7 @@ renderIncubation incubation =
             , Html.text " - "
             , Html.text (DE.toFormattedString "MMMM ddd, y HH:MM" incubation.sampled_at)
             , Html.text " - "
-            , label []
-                [ input
-                    [ class "deletePoint"
-                    , type_ "checkbox"
-                    , onClick (DeleteAllPoints incubation)
-                    ]
-                    []
-                , Html.text "Bad Incubation"
-                ]
+            , button [ onClick (DeleteAllPoints incubation) ] [ Html.text "Delete" ]
             ]
         , div []
             [ draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)

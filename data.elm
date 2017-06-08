@@ -463,18 +463,6 @@ runIdResponseDecoder =
 
 
 
--- decodeRun : String -> Run
--- decodeRun json =
---     case decodeString runResponseDecoder json of
---         Ok run ->
---             run
---
---         Err msg ->
---             let
---                 _ =
---                     Debug.log "ERROR parsing run" msg
---             in
---                 Run 0 "nothing" [] [] [] Nothing Nothing Nothing
 --- ENCODERS
 
 
@@ -567,13 +555,14 @@ runDetailEncoder run =
         [ ( "incubations", JE.list (List.map incubationEncoder run.incubations) )
         , ( "standards", JE.list (List.map standardEncoder run.standards) )
         , ( "id", JE.int run.id )
-        , ( "calibrations"
-          , JE.list
-                [ JEE.maybe fluxEncoder run.co2_calibration
-                , JEE.maybe fluxEncoder run.n2o_calibration
-                , JEE.maybe fluxEncoder run.ch4_calibration
-                ]
-          )
+
+        -- , ( "calibrations"
+        --   , JE.list
+        --         [ JEE.maybe fluxEncoder run.co2_calibration
+        --         , JEE.maybe fluxEncoder run.n2o_calibration
+        --         , JEE.maybe fluxEncoder run.ch4_calibration
+        --         ]
+        --   )
         ]
 
 

@@ -278,7 +278,11 @@ computeCalibrationCH4 standards =
 
 computeCalibrationCO2 : List Standard -> Flux
 computeCalibrationCO2 standards =
-    averageCalibration CO2 (co2_standards standards) 1
+    let
+        _ =
+            Debug.log "computing calibration with"
+    in
+        averageCalibration CO2 (co2_standards standards) 700
 
 
 
@@ -330,11 +334,19 @@ updateCalibrationCO2 run point =
 averageCalibration : Gas -> List Point -> Float -> Flux
 averageCalibration gas points standard_value =
     let
-        average_mv =
+        good_points =
             points
                 |> List.filter (\x -> not x.deleted)
                 |> List.map (\x -> x.y)
-                |> List.sum
+
+        sum_mv =
+            List.sum good_points
+
+        count =
+            List.length good_points
+
+        average_mv =
+            sum_mv / toFloat (count)
 
         calibration_value =
             standard_value / average_mv
