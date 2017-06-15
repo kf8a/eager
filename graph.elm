@@ -1,10 +1,10 @@
-module Graph exposing (..)
+port module Graph exposing (..)
 
 import Date.Extra as DE exposing (..)
 import Html
 import Html exposing (..)
 import Html exposing (program, Html)
-import Html.Attributes as HA exposing (style, href, target)
+import Html.Attributes as HA exposing (style, href, target, src)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (..)
@@ -15,6 +15,8 @@ import LeastSquares exposing (..)
 import Calibration exposing (..)
 import Round exposing (..)
 import Data exposing (..)
+import Authentication
+import Auth0
 
 
 type Msg
@@ -31,17 +33,29 @@ type Msg
     | FluxBad Run
     | DeleteAllPoints Incubation
       -- | SavedIncubation (Result Http.Error Incubation)
-    | NoOp
+    | AuthenticationMsg Authentication.Msg
 
 
-initialModel : Model
-initialModel =
+initialModel : Maybe Auth0.LoggedInUser -> Model
+initialModel initialUser =
     { run = initialRun
     , saving = False
     , error = Nothing
     , previous_runs = []
     , next_runs = []
+    , authModel = (Authentication.init auth0showLock auth0logout initialUser)
+    , token = Nothing
     }
+
+
+init : Maybe Auth0.LoggedInUser -> ( Model, Cmd Msg )
+init initialUser =
+    ( (initialModel initialUser)
+    , fetchRunIds
+        (Authentication.tryGetToken
+            (initialModel initialUser).authModel
+        )
+    )
 
 
 
@@ -168,7 +182,14 @@ drawXAxis xAxis yAxis =
         , stroke "black"
         , class "xAxis"
         ]
-        []
+        [ line
+            [ x1 (toString xAxis.min_extent)
+            , y1 (toString yAxis.min_extent)
+            , x2 (toString xAxis.min_extent)
+            , y2 (toString (yAxis.min_extent + 5))
+            ]
+            []
+        ]
 
 
 drawYAxis : Axis -> Axis -> Svg Msg
@@ -382,12 +403,12 @@ dot xAxis yAxis msg point =
 
 toXAxis : List Point -> Axis
 toXAxis points =
-    Axis 0 100 (minX points) (maxX points)
+    Axis 0 50 (minX points) (maxX points)
 
 
 toYAxis : List Point -> Axis
 toYAxis points =
-    Axis 0 100 0 (maxY points)
+    Axis 0 50 0 (maxY points)
 
 
 standardDots : Gas -> List Point -> List (Svg Msg)
@@ -545,6 +566,34 @@ view model =
                 |> List.sortWith orderedIncubation
                 |> List.map renderIncubation
             )
+        , div []
+            (case Authentication.tryGetUserProfile model.authModel of
+                Nothing ->
+                    [ p [] [ Html.text "Please log in" ] ]
+
+                Just user ->
+                    [ p [] [ Html.text ("Hello, " ++ user.name ++ "!") ] ]
+            )
+        , p []
+            [ button
+                [ class "btn btn-primary"
+                , onClick
+                    (AuthenticationMsg
+                        (if Authentication.isLoggedIn model.authModel then
+                            Authentication.LogOut
+                         else
+                            Authentication.ShowLogIn
+                        )
+                    )
+                ]
+                [ Html.text
+                    (if Authentication.isLoggedIn model.authModel then
+                        "Logout"
+                     else
+                        "Login"
+                    )
+                ]
+            ]
         ]
 
 
@@ -567,20 +616,50 @@ runIdUrl =
     base_url ++ "runs"
 
 
-fetchRunIds : Cmd Msg
-fetchRunIds =
-    Http.get runIdUrl runIdResponseDecoder
-        |> Http.send LoadRunIds
+runIdRequest : String -> String -> Http.Request (List Run)
+runIdRequest url token =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+        , url = url
+        , body = Http.emptyBody
+        , expect = Http.expectJson runIdResponseDecoder
+        , timeout = Nothing
+        , withCredentials = False
+        }
 
 
-fetchRun : Run -> Cmd Msg
-fetchRun run =
-    let
-        _ =
-            Debug.log "fetching run" run.id
-    in
-        Http.get (runUrl run.id) runResponseDecoder
-            |> Http.send LoadRun
+fetchRunIds : Maybe String -> Cmd Msg
+fetchRunIds token =
+    case token of
+        Just token ->
+            Http.send LoadRunIds (runIdRequest runIdUrl token)
+
+        Nothing ->
+            Cmd.none
+
+
+runRequest : String -> Int -> Http.Request Run
+runRequest token id =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+        , url = runUrl id
+        , body = Http.emptyBody
+        , expect = Http.expectJson runResponseDecoder
+        , timeout = Nothing
+        , withCredentials = False
+        }
+
+
+fetchRun : Maybe String -> Run -> Cmd Msg
+fetchRun token run =
+    case token of
+        Just token ->
+            Http.send LoadRun (runRequest token run.id)
+
+        Nothing ->
+            Cmd.none
 
 
 fetchNextRun : Model -> Cmd Msg
@@ -831,7 +910,7 @@ update msg model =
                     Maybe.withDefault [] (List.tail runs)
             in
                 ( { model | run = current_run, next_runs = next_runs }
-                , (fetchRun current_run)
+                , fetchRun model.token current_run
                 )
 
         LoadRunIds (Err msg) ->
@@ -854,7 +933,14 @@ update msg model =
 
                 -- TODO: clean up older prev runs to reduce memory usage
             in
-                ( { model | run = run, previous_runs = previous_runs, next_runs = next_runs }, fetchRun run )
+                ( { model
+                    | run = run
+                    , previous_runs = previous_runs
+                    , next_runs =
+                        next_runs
+                  }
+                , fetchRun model.token run
+                )
 
         NextRun ->
             let
@@ -882,10 +968,35 @@ update msg model =
             in
                 ( { model | run = newRun }, Cmd.none )
 
-        NoOp ->
-            ( model, Cmd.none )
+        AuthenticationMsg authMsg ->
+            let
+                ( authModel, cmd ) =
+                    Authentication.update authMsg model.authModel
+
+                token =
+                    Authentication.tryGetToken authModel
+            in
+                ( { model | authModel = authModel, token = token }
+                , Cmd.batch
+                    [ Cmd.map AuthenticationMsg cmd
+                    , fetchRunIds token
+                    ]
+                )
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( initialModel, fetchRunIds )
+
+-- Ports
+
+
+port auth0showLock : Auth0.Options -> Cmd msg
+
+
+port auth0authResult : (Auth0.RawAuthenticationResult -> msg) -> Sub msg
+
+
+port auth0logout : () -> Cmd msg
+
+
+subscriptions : a -> Sub Msg
+subscriptions model =
+    auth0authResult (Authentication.handleAuthResult >> AuthenticationMsg)

@@ -3,13 +3,14 @@ module Main exposing (..)
 import Graph exposing (..)
 import Data exposing (..)
 import Html
+import Auth0
 
 
-main : Program Never Model Msg
+main : Program (Maybe Auth0.LoggedInUser) Model Msg
 main =
-    Html.program
+    Html.programWithFlags
         { init = init
         , update = update
-        , subscriptions = (\_ -> Sub.none)
+        , subscriptions = subscriptions
         , view = view
         }

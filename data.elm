@@ -8,6 +8,7 @@ import Json.Decode as JD exposing (..)
 import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Json.Encode as JE exposing (..)
 import Json.Encode.Extra as JEE exposing (..)
+import Authentication exposing (..)
 
 
 type alias Flux =
@@ -79,6 +80,8 @@ type alias Model =
     , error : Maybe String
     , previous_runs : List Run
     , next_runs : List Run
+    , authModel : Authentication.Model
+    , token : Maybe String
     }
 
 
