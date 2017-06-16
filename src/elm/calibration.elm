@@ -344,3 +344,15 @@ averageCalibration gas points standard_value =
             standard_value / average_mv
     in
         Flux calibration_value 0 0 Nothing gas
+
+
+regressionCalibration : Gas -> List Point -> Float -> Flux
+regressionCalibration gas points standard_value =
+    let
+        good_points =
+            List.filter (\x -> not x.deleted) points
+
+        fit =
+            fitLineByLeastSquares good_points
+    in
+        Flux calibration_value 0 0 Nothing gas

@@ -354,35 +354,6 @@ injectionDataDecoder =
         |> required "data" injectionDecoder
 
 
-
--- decodeInjection : String -> Injection
--- decodeInjection json =
---     case decodeString injectionDataDecoder json of
---         Ok injection ->
---             injection
---
---         Err msg ->
---             let
---                 date =
---                     Date.fromTime (Time.inSeconds 0)
---             in
---                 Injection 0 0 0 0 0 0 0 False False False date
---
---
--- decodeInjections : String -> List Injection
--- decodeInjections json =
---     case decodeString responseDecoder json of
---         Ok listOfInjections ->
---             listOfInjections
---
---         Err msg ->
---             let
---                 _ =
---                     Debug.log "ERROR decoding injections:" msg
---             in
---                 []
-
-
 decodeStandards : String -> List Standard
 decodeStandards json =
     case decodeString standardResponseDecoder json of
