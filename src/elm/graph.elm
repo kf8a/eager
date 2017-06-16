@@ -44,7 +44,6 @@ initialModel initialUser =
     , previous_runs = []
     , next_runs = []
     , authModel = (Authentication.init auth0showLock auth0logout initialUser)
-    , token = Nothing
     }
 
 
@@ -52,8 +51,12 @@ init : Maybe Auth0.LoggedInUser -> ( Model, Cmd Msg )
 init initialUser =
     ( (initialModel initialUser)
     , fetchRunIds
-        (Authentication.tryGetToken
-            (initialModel initialUser).authModel
+        (Maybe.withDefault
+            ""
+            ((Authentication.tryGetToken
+                (initialModel initialUser).authModel
+             )
+            )
         )
     )
 
@@ -616,12 +619,12 @@ runIdUrl =
     base_url ++ "runs"
 
 
-runIdRequest : String -> String -> Http.Request (List Run)
-runIdRequest url token =
+runIdRequest : String -> Http.Request (List Run)
+runIdRequest token =
     Http.request
         { method = "GET"
         , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
-        , url = url
+        , url = runIdUrl
         , body = Http.emptyBody
         , expect = Http.expectJson runIdResponseDecoder
         , timeout = Nothing
@@ -629,14 +632,9 @@ runIdRequest url token =
         }
 
 
-fetchRunIds : Maybe String -> Cmd Msg
+fetchRunIds : String -> Cmd Msg
 fetchRunIds token =
-    case token of
-        Just token ->
-            Http.send LoadRunIds (runIdRequest runIdUrl token)
-
-        Nothing ->
-            Cmd.none
+    Http.send LoadRunIds (runIdRequest token)
 
 
 runRequest : String -> Int -> Http.Request Run
@@ -652,14 +650,9 @@ runRequest token id =
         }
 
 
-fetchRun : Maybe String -> Run -> Cmd Msg
+fetchRun : String -> Run -> Cmd Msg
 fetchRun token run =
-    case token of
-        Just token ->
-            Http.send LoadRun (runRequest token run.id)
-
-        Nothing ->
-            Cmd.none
+    Http.send LoadRun (runRequest token run.id)
 
 
 fetchNextRun : Model -> Cmd Msg
@@ -670,8 +663,16 @@ fetchNextRun model =
     in
         case run of
             Just run ->
-                Http.get (runUrl run.id) runResponseDecoder
-                    |> Http.send PreLoadRun
+                case Authentication.tryGetToken model.authModel of
+                    Just token ->
+                        Http.send PreLoadRun (runRequest token run.id)
+
+                    Nothing ->
+                        let
+                            _ =
+                                Debug.log "not logged in"
+                        in
+                            Cmd.none
 
             Nothing ->
                 Cmd.none
@@ -909,10 +910,29 @@ update msg model =
                 next_runs =
                     Maybe.withDefault [] (List.tail runs)
             in
-                ( { model | run = current_run, next_runs = next_runs }
-                , fetchRun model.token current_run
-                )
+                case Authentication.tryGetToken model.authModel of
+                    Just token ->
+                        ( { model | run = current_run, next_runs = next_runs }
+                        , fetchRun token current_run
+                        )
 
+                    Nothing ->
+                        ( model, Cmd.none )
+
+        -- TODO: Log out when the server returns unauthorized, so that
+        -- we can display the login box again
+        -- LoadRunIds (Err (Http.BadStatus response)) ->
+        --     let
+        --         _ =
+        --             Debug.log "Bad Status" response.status
+        --
+        --         cmd =
+        --             if response.status.code == 401 then
+        --                 Authentication.LogOut
+        --             else
+        --                 Cmd.none
+        --     in
+        --         ( model, cmd )
         LoadRunIds (Err msg) ->
             let
                 _ =
@@ -933,14 +953,19 @@ update msg model =
 
                 -- TODO: clean up older prev runs to reduce memory usage
             in
-                ( { model
-                    | run = run
-                    , previous_runs = previous_runs
-                    , next_runs =
-                        next_runs
-                  }
-                , fetchRun model.token run
-                )
+                case Authentication.tryGetToken model.authModel of
+                    Just token ->
+                        ( { model
+                            | run = run
+                            , previous_runs = previous_runs
+                            , next_runs =
+                                next_runs
+                          }
+                        , fetchRun token run
+                        )
+
+                    Nothing ->
+                        ( model, Cmd.none )
 
         NextRun ->
             let
@@ -973,10 +998,11 @@ update msg model =
                 ( authModel, cmd ) =
                     Authentication.update authMsg model.authModel
 
+                -- We should have a token at this point
                 token =
-                    Authentication.tryGetToken authModel
+                    Maybe.withDefault "" (Authentication.tryGetToken authModel)
             in
-                ( { model | authModel = authModel, token = token }
+                ( { model | authModel = authModel }
                 , Cmd.batch
                     [ Cmd.map AuthenticationMsg cmd
                     , fetchRunIds token

@@ -1,3 +1,4 @@
 elm-stuff
 *.sql
 elm.js
+node_modules

@@ -81,7 +81,6 @@ type alias Model =
     , previous_runs : List Run
     , next_runs : List Run
     , authModel : Authentication.Model
-    , token : Maybe String
     }
 
 
