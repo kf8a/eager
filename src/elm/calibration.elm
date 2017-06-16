@@ -2,6 +2,7 @@ module Calibration exposing (..)
 
 import Data exposing (..)
 import LeastSquares exposing (..)
+import Date exposing (toTime)
 
 
 --- Compute Fluxes
@@ -128,14 +129,18 @@ computeCH4Fluxes run =
 --- Calibrations
 
 
+calibrationValue : Flux -> Injection -> Float
+calibrationValue calibration injection =
+    calibration.intercept
+        + calibration.slope
+        * (Date.toTime injection.datetime)
+
+
 calibrateInjectionN2O : Flux -> Injection -> Injection
 calibrateInjectionN2O calibration injection =
     let
         n2o_ppm =
-            calibration.slope * injection.n2o_mv
-
-        -- n2o_ppm =
-        --     calibration.intercept + calibration.slope * injection.n2o_mv
+            injection.n2o_mv * (calibrationValue calibration injection)
     in
         { injection | n2o_ppm = n2o_ppm }
 
@@ -144,7 +149,7 @@ calibrateInjectionCH4 : Flux -> Injection -> Injection
 calibrateInjectionCH4 calibration injection =
     let
         ch4_ppm =
-            calibration.intercept + calibration.slope * injection.ch4_mv
+            injection.ch4_mv * (calibrationValue calibration injection)
     in
         { injection | ch4_ppm = ch4_ppm }
 
@@ -153,7 +158,7 @@ calibrateInjectionCO2 : Flux -> Injection -> Injection
 calibrateInjectionCO2 calibration injection =
     let
         co2_ppm =
-            calibration.intercept + calibration.slope * injection.co2_mv
+            injection.co2_mv * (calibrationValue calibration injection)
     in
         { injection | co2_ppm = co2_ppm }
 
@@ -264,12 +269,12 @@ calibrateRunCO2 run =
 
 computeCalibrationN2O : List Standard -> Flux
 computeCalibrationN2O standards =
-    averageCalibration N2O (n2o_standards standards) 0.3
+    regressionCalibration N2O (n2o_standards standards) 0.3
 
 
 computeCalibrationCH4 : List Standard -> Flux
 computeCalibrationCH4 standards =
-    averageCalibration CH4 (ch4_standards standards) 4.0
+    regressionCalibration CH4 (ch4_standards standards) 4.0
 
 
 computeCalibrationCO2 : List Standard -> Flux
@@ -278,7 +283,7 @@ computeCalibrationCO2 standards =
         _ =
             Debug.log "computing calibration with"
     in
-        averageCalibration CO2 (co2_standards standards) 700
+        regressionCalibration CO2 (co2_standards standards) 700
 
 
 updateCalibrationN2O : Run -> Point -> Run
@@ -346,13 +351,36 @@ averageCalibration gas points standard_value =
         Flux calibration_value 0 0 Nothing gas
 
 
+convertToCalibrationPoint : Point -> Float -> Point
+convertToCalibrationPoint point standard_value =
+    let
+        calibrationValue =
+            standard_value / point.y
+    in
+        Point point.x calibrationValue point.deleted point.id
+
+
 regressionCalibration : Gas -> List Point -> Float -> Flux
 regressionCalibration gas points standard_value =
     let
         good_points =
-            List.filter (\x -> not x.deleted) points
+            points
+                |> List.filter (\x -> not x.deleted)
+                |> List.map (\x -> convertToCalibrationPoint x standard_value)
 
-        fit =
-            fitLineByLeastSquares good_points
+        _ =
+            Debug.log "gas" gas
+
+        _ =
+            Debug.log "calibration points" good_points
+
+        flux =
+            computeFlux gas good_points
+
+        _ =
+            Debug.log "slope" flux.slope
+
+        _ =
+            Debug.log "intercept" flux.intercept
     in
-        Flux calibration_value 0 0 Nothing gas
+        computeFlux gas good_points

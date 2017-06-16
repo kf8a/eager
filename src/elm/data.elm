@@ -172,6 +172,10 @@ sortedRecords a b =
     DE.compare a.datetime b.datetime
 
 
+
+-- Time Helpers
+
+
 initialTime : List Injection -> Date
 initialTime injections =
     let
