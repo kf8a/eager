@@ -239,11 +239,6 @@ n2o_standards standards =
     List.map (\x -> Point (Date.toTime x.sampled_at) x.n2o_mv x.n2o_deleted x.id) standards
 
 
-n2o_standard_values : List Standard -> List Point
-n2o_standard_values standards =
-    List.map (\x -> Point x.n2o_mv x.n2o_ppm x.n2o_deleted x.id) standards
-
-
 ch4_standards : List Standard -> List Point
 ch4_standards standards =
     List.map (\x -> Point (Date.toTime x.sampled_at) x.ch4_mv x.ch4_deleted x.id) standards
