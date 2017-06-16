@@ -406,12 +406,12 @@ dot xAxis yAxis msg point =
 
 toXAxis : List Point -> Axis
 toXAxis points =
-    Axis 0 50 (minX points) (maxX points)
+    Axis 0 150 (minX points) (maxX points)
 
 
 toYAxis : List Point -> Axis
 toYAxis points =
-    Axis 0 50 0 (maxY points)
+    Axis 0 150 0 (maxY points)
 
 
 standardDots : Gas -> List Point -> List (Svg Msg)
@@ -881,9 +881,6 @@ update msg model =
 
         PreLoadRun (Ok run) ->
             let
-                _ =
-                    Debug.log "preloaded" run.id
-
                 tail =
                     Maybe.withDefault [] (List.tail model.next_runs)
 
