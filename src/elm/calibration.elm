@@ -68,9 +68,6 @@ updateRunStandard run updater point =
 computeCO2Flux : Incubation -> Incubation
 computeCO2Flux incubation =
     let
-        _ =
-            Debug.log "computing CO2 Flux" incubation
-
         new_flux =
             computeFlux CO2 (co2_injections incubation.injections)
     in
@@ -80,9 +77,6 @@ computeCO2Flux incubation =
 computeN2OFlux : Incubation -> Incubation
 computeN2OFlux incubation =
     let
-        _ =
-            Debug.log "computing N2O Flux" incubation
-
         new_flux =
             computeFlux N2O (n2o_injections incubation.injections)
     in
@@ -279,11 +273,7 @@ computeCalibrationCH4 standards =
 
 computeCalibrationCO2 : List Standard -> Flux
 computeCalibrationCO2 standards =
-    let
-        _ =
-            Debug.log "computing calibration with"
-    in
-        regressionCalibration CO2 (co2_standards standards) 700
+    regressionCalibration CO2 (co2_standards standards) 700
 
 
 updateCalibrationN2O : Run -> Point -> Run
@@ -363,24 +353,13 @@ convertToCalibrationPoint point standard_value =
 regressionCalibration : Gas -> List Point -> Float -> Flux
 regressionCalibration gas points standard_value =
     let
+        --TODO: I need to use mv's here not ppm
         good_points =
             points
                 |> List.filter (\x -> not x.deleted)
                 |> List.map (\x -> convertToCalibrationPoint x standard_value)
 
-        _ =
-            Debug.log "gas" gas
-
-        _ =
-            Debug.log "calibration points" good_points
-
         flux =
             computeFlux gas good_points
-
-        _ =
-            Debug.log "slope" flux.slope
-
-        _ =
-            Debug.log "intercept" flux.intercept
     in
         computeFlux gas good_points
