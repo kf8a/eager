@@ -630,7 +630,11 @@ renderList points =
 renderIncubation : Incubation -> Html Msg
 renderIncubation incubation =
     div []
-        [ span [] [ Html.text incubation.chamber ]
+        [ span []
+            [ Html.text incubation.chamber
+            , Html.text " - "
+            , Html.text (toString incubation.id)
+            ]
         , draw_injections N2O incubation.n2o_flux incubation (n2o_injections incubation.injections)
         , draw_injections CO2 incubation.co2_flux incubation (co2_injections incubation.injections)
         , draw_injections CH4 incubation.ch4_flux incubation (ch4_injections incubation.injections)
