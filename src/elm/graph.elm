@@ -652,7 +652,8 @@ runRequest token id =
 
 fetchRun : String -> Run -> Cmd Msg
 fetchRun token run =
-    Http.send LoadRun (runRequest token run.id)
+    runRequest token run.id
+        |> Http.send LoadRun
 
 
 fetchNextRun : Model -> Cmd Msg
