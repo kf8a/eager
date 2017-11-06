@@ -274,19 +274,33 @@ renderStandardValue label flux =
             g [] []
 
 
+equation : Float -> Float -> String
+equation intercept slope =
+    if slope > 0 then
+        String.concat
+            [ "y = "
+            , Round.round 4 intercept
+            , " + "
+            , Round.round 4 slope
+            , " x"
+            ]
+    else
+        String.concat
+            [ "y = "
+            , Round.round 4 intercept
+            , " - "
+            , Round.round 4 (abs slope)
+            , " x"
+            ]
+
+
 renderFluxEq : String -> Maybe Flux -> Svg Msg
 renderFluxEq label flux =
     case flux of
         Just flux ->
             let
                 eq =
-                    String.concat
-                        [ "y = "
-                        , Round.round 4 flux.intercept
-                        , " + "
-                        , Round.round 4 flux.slope
-                        , " x"
-                        ]
+                    equation flux.intercept flux.slope
 
                 r =
                     String.concat
@@ -406,12 +420,12 @@ dot xAxis yAxis msg point =
 
 toXAxis : List Point -> Axis
 toXAxis points =
-    Axis 0 150 (minX points) (maxX points)
+    Axis 0 100 (minX points) (maxX points)
 
 
 toYAxis : List Point -> Axis
 toYAxis points =
-    Axis 0 150 0 (maxY points)
+    Axis 0 100 0 (maxY points)
 
 
 standardDots : Gas -> List Point -> List (Svg Msg)
@@ -510,6 +524,19 @@ prevRunButton model =
         button [ onClick PrevRun ]
             [ Html.text "Prev" ]
 
+goodBadButtons : Model -> Html Msg
+goodBadButtons model =
+  span [] [ button
+    [ onClick (FluxGood model.run) ]
+    [ Html.text "Good" ]
+    , button
+    [ onClick (FluxMaybeGood model.run) ]
+    [ Html.text "Maybe" ]
+    , button
+    [ onClick (FluxBad model.run) ]
+    [ Html.text "Bad" ]
+    ]
+
 
 drawNextPrevRun : Model -> Html Msg
 drawNextPrevRun model =
@@ -528,15 +555,7 @@ drawNextPrevRun model =
             [ Html.text (toString model.run.id) ]
         , nextRunButton model
         , Html.text model.run.setup_file
-        , button
-            [ onClick (FluxGood model.run) ]
-            [ Html.text "Good" ]
-        , button
-            [ onClick (FluxMaybeGood model.run) ]
-            [ Html.text "Maybe" ]
-        , button
-            [ onClick (FluxBad model.run) ]
-            [ Html.text "Bad" ]
+        , goodBadButtons model
         ]
 
 
@@ -569,6 +588,7 @@ view model =
                 |> List.sortWith orderedIncubation
                 |> List.map renderIncubation
             )
+        , goodBadButtons model
         , div []
             (case Authentication.tryGetUserProfile model.authModel of
                 Nothing ->
@@ -689,11 +709,21 @@ saveUrl id =
     "http://localhost:4000/api/runs/" ++ (toString id)
 
 
-saveRun : Run -> Cmd Msg
-saveRun run =
-    HttpBuilder.put (saveUrl run.id)
-        |> withJsonBody (runEncoder run)
-        |> send runSaved
+saveRun : Model -> Cmd Msg
+saveRun model =
+    case Authentication.tryGetToken model.authModel of
+        Just token ->
+            HttpBuilder.put (saveUrl model.run.id)
+                |> withHeader "Authorization" ("Bearer " ++ token)
+                |> withJsonBody (runEncoder model.run)
+                |> send runSaved
+
+        Nothing ->
+            let
+                _ =
+                    Debug.log "not logged in"
+            in
+                Cmd.none
 
 
 nextRun : Model -> Model
@@ -834,7 +864,7 @@ update msg model =
                 newModel =
                     { model | run = newRun }
             in
-                ( { newModel | saving = True }, saveRun newModel.run )
+                ( { newModel | saving = True }, saveRun newModel )
 
         FluxMaybeGood run ->
             let
@@ -844,7 +874,7 @@ update msg model =
                 newModel =
                     { model | run = newRun }
             in
-                ( { newModel | saving = True }, saveRun newModel.run )
+                ( { newModel | saving = True }, saveRun newModel )
 
         FluxBad run ->
             let
@@ -854,7 +884,7 @@ update msg model =
                 newModel =
                     { model | run = newRun }
             in
-                ( { newModel | saving = True }, saveRun newModel.run )
+                ( { newModel | saving = True }, saveRun newModel )
 
         RunSaved (Ok run) ->
             let
@@ -871,7 +901,7 @@ update msg model =
                 updatedRun =
                     calibrateRun run
             in
-                ( { model | run = updatedRun }, fetchNextRun model )
+                ( { model | run = updatedRun, error = Nothing }, fetchNextRun model )
 
         LoadRun (Err msg) ->
             let
@@ -886,7 +916,7 @@ update msg model =
                     Maybe.withDefault [] (List.tail model.next_runs)
 
                 updatedRun =
-                    calibrateRun run
+                  calibrateRun run
 
                 newRuns =
                     [ updatedRun ] ++ tail
@@ -1019,6 +1049,10 @@ port auth0authResult : (Auth0.RawAuthenticationResult -> msg) -> Sub msg
 
 
 port auth0logout : () -> Cmd msg
+
+
+
+-- Subscriptions
 
 
 subscriptions : a -> Sub Msg
